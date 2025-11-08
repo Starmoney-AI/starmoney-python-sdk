@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "starmoney-python"
-version = "0.1.44"
+version = "0.1.5"
 description = "Official Python SDK for StarMoney Bank API - Ultra-light async client"
 authors = ["StarMoney Team <dev@starmoney.com>"]
 license = "MIT"

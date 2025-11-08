@@ -44,10 +44,10 @@ async def main():
             address="123 Main St"
         )
         user_id = account["user_id"]
-        
+
         # 2. Link payment rail
         await client.accounts.link_rail(user_id, rail_name="BDK")
-        
+
         # 3. Send payment
         payment = await client.payments.send(
             user_id=user_id,
@@ -57,13 +57,13 @@ async def main():
             beneficiary_name="Jane Smith",
             description="Test payment"
         )
-        
+
         # 4. Check status
         status = await client.payments.get_status(
             user_id=user_id,
             client_transaction_id=payment["client_transaction_id"]
         )
-        
+
         print(f"Payment status: {status['status']}")
 
 asyncio.run(main())
@@ -187,21 +187,21 @@ async def handle_webhook(request: Request):
     # Get raw payload and signature
     payload = await request.body()
     signature = request.headers.get("X-Webhook-Signature")
-    
+
     # Validate signature (prevents spoofed webhooks)
     try:
         event = validator.parse_webhook(payload, signature)
     except Exception:
         raise HTTPException(status_code=401, detail="Invalid signature")
-    
+
     # Process webhook
     event_type = event["event_type"]
     event_data = event["data"]
-    
+
     if event_type == "payment.completed":
         # Handle successful payment
         print(f"Payment completed: {event_data['transaction_id']}")
-    
+
     return {"status": "received"}
 ```
 

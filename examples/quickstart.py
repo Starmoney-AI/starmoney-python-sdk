@@ -62,7 +62,7 @@ async def main():
         )
 
         client_txn_id = payment["client_transaction_id"]
-        print(f"✅ Payment sent")
+        print("✅ Payment sent")
         print(f"   Transaction ID: {payment['transaction_id'][:8]}...")
         print(f"   Client TX ID: {client_txn_id}")
 

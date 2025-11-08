@@ -26,9 +26,10 @@ class PaymentsResource:
         beneficiary_iban: str,
         beneficiary_name: str,
         description: str,
-        rail_name: str = "BDK",
-        client_transaction_id: Optional[str] = None,
-    ) -> dict[str, Any]:
+        rail_name: str,
+        client_transaction_id: str,
+        metadata: Optional[dict[str, Any]] = None,
+        ) -> dict[str, Any]:
         """
         Send a payment.
 
@@ -39,8 +40,8 @@ class PaymentsResource:
             beneficiary_iban: Recipient's IBAN
             beneficiary_name: Recipient's name
             description: Payment description
-            rail_name: Payment rail to use (default: 'BDK')
-            client_transaction_id: Optional idempotency key. If not provided,
+            rail_name: Payment rail to use
+            client_transaction_id: Idempotency key. If not provided,
                                    a UUID will be automatically generated.
 
         Returns:
@@ -54,17 +55,15 @@ class PaymentsResource:
                 currency="EUR",
                 beneficiary_iban="FR1420041010050500013M02606",
                 beneficiary_name="John Doe",
-                description="Test payment"
+                description="Test payment",
+                rail_name="BDK",
+                client_transaction_id="ID548714"
             )
 
             # Track this payment
             client_txn_id = payment["client_transaction_id"]
             ```
         """
-        # Auto-generate client_transaction_id if not provided (idempotency)
-        if client_transaction_id is None:
-            client_transaction_id = f"sdk-{uuid.uuid4()}"
-
         # Convert amount to string for API
         if isinstance(amount, Decimal):
             amount_str = str(amount)
@@ -81,6 +80,7 @@ class PaymentsResource:
             "description": description,
             "rail_name": rail_name,
             "client_transaction_id": client_transaction_id,
+            "metadata": metadata,
         }
 
         response = await self.http.post("/payments", json=payload, user_id=user_id)
