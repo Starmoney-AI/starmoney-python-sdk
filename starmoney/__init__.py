@@ -12,14 +12,12 @@ Quick Start:
         issuer="your-service",
         up3_secret="your-up3-secret",  # same as jwt_secret in v0.1
     ) as client:
-        # Create account
-        account = await client.accounts.create(...)
-
-        # Provision vIBAN
-        viban = await client.accounts.provision_viban(
-            viban_tenant_slug="solarbox",
-            holder_name="Fatou Ndiaye",
+        # Open a StarMoney account (home vIBAN provisioned inline by create)
+        account = await client.accounts.create(
+            ..., viban_tenant_slug="solarbox",
         )
+        if account["account_state"] == "active_pre_kyc":
+            viban = account["account_reference"]
 
         # Send payment with UP3 mandate chain
         result = await client.payments.send_with_mandates(

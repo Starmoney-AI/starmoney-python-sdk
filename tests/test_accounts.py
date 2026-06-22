@@ -1,4 +1,5 @@
-"""SDK unit tests — AccountsResource: provision_viban, submit_kyc, get/update profile."""
+"""SDK unit tests — AccountsResource: create (home-vIBAN merge), get_status,
+submit_kyc, get/update profile."""
 
 from __future__ import annotations
 
@@ -14,55 +15,90 @@ def _make_resource():
 
 
 # ---------------------------------------------------------------------------
-# provision_viban
+# create — opens the account AND provisions the home vIBAN inline
 # ---------------------------------------------------------------------------
 
 
 @pytest.mark.asyncio
-async def test_provision_viban_sends_correct_body():
+async def test_create_forwards_tenant_and_returns_provisioned_state():
     resource, http = _make_resource()
-
     mock_resp = MagicMock()
     mock_resp.json.return_value = {
-        "account_reference": "SN12K001",
-        "upstream_account_id": "uuid-1",
+        "user_id": "user-1",
         "account_state": "active_pre_kyc",
-        "correlation_id": "corr-1",
+        "account_reference": "SN12K001",
+        "message": "StarMoney account created and home vIBAN provisioned",
     }
     http.post = AsyncMock(return_value=mock_resp)
 
-    result = await resource.provision_viban(
+    result = await resource.create(
+        first_name="Fatou",
+        last_name="Ndiaye",
+        email="fatou@example.com",
+        phone_number="+221771234567",
+        document_type="PASSPORT",
+        document_number="AB123456",
+        address="Dakar",
         viban_tenant_slug="solarbox",
-        currency="XOF",
-        holder_name="Fatou Ndiaye",
     )
 
-    http.post.assert_called_once_with(
-        "/accounts/provision-viban",
-        json={
-            "viban_tenant_slug": "solarbox",
-            "currency": "XOF",
-            "holder_name": "Fatou Ndiaye",
-        },
-        user_id=None,
-    )
+    http.post.assert_called_once()
+    path = http.post.call_args.args[0]
+    assert path == "/accounts"
+    sent = http.post.call_args.kwargs["json"]
+    # tenant slug is forwarded so the home vIBAN provisions in the right tenant
+    assert sent["viban_tenant_slug"] == "solarbox"
     assert result["account_state"] == "active_pre_kyc"
     assert result["account_reference"] == "SN12K001"
 
 
 @pytest.mark.asyncio
-async def test_provision_viban_defaults():
+async def test_create_omits_tenant_when_not_provided():
     resource, http = _make_resource()
     mock_resp = MagicMock()
-    mock_resp.json.return_value = {"account_state": "active_pre_kyc"}
+    mock_resp.json.return_value = {"user_id": "user-2", "account_state": "captured"}
     http.post = AsyncMock(return_value=mock_resp)
 
-    await resource.provision_viban(viban_tenant_slug="bdk", user_id="test-user")
+    await resource.create(
+        first_name="Awa",
+        last_name="Sow",
+        email="awa@example.com",
+        phone_number="+221770000000",
+        document_type="ID_CARD",
+        document_number="CNI-1",
+        address="Thiès",
+    )
 
-    called_json = http.post.call_args.kwargs["json"]
-    assert called_json["currency"] == "XOF"
-    assert called_json["holder_name"] == "Customer"
-    assert called_json["viban_tenant_slug"] == "bdk"
+    sent = http.post.call_args.kwargs["json"]
+    # no tenant → key absent (server resolves the sole configured tenant)
+    assert "viban_tenant_slug" not in sent
+
+
+# ---------------------------------------------------------------------------
+# get_status — account-status enquiry (state, never balance)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_get_status_calls_correct_path_with_user_token():
+    resource, http = _make_resource()
+    mock_resp = MagicMock()
+    mock_resp.json.return_value = {
+        "user_id": "user-1",
+        "account_state": "active_pre_kyc",
+        "is_provisioned": True,
+        "kyc_verified": False,
+        "kyc_required": True,
+    }
+    http.get = AsyncMock(return_value=mock_resp)
+
+    result = await resource.get_status("user-1")
+
+    http.get.assert_called_once_with("/accounts/status", user_id="user-1")
+    assert result["account_state"] == "active_pre_kyc"
+    assert result["kyc_required"] is True
+    # positioning: status is state, never a balance
+    assert "balance" not in result
 
 
 # ---------------------------------------------------------------------------
