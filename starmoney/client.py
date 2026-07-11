@@ -10,6 +10,7 @@ from .auth import AuthManager
 from .http_client import HTTPClient
 from .resources.accounts import AccountsResource
 from .resources.beneficiaries import BeneficiariesResource
+from .resources.deferred_transfers import DeferredTransfersResource
 from .resources.payments import PaymentsResource
 from .resources.webhooks import WebhooksResource
 
@@ -104,6 +105,7 @@ class StarmoneyClient:
         # Initialize resources
         self._accounts: Optional[AccountsResource] = None
         self._beneficiaries: Optional[BeneficiariesResource] = None
+        self._deferred_transfers: Optional[DeferredTransfersResource] = None
         self._payments: Optional[PaymentsResource] = None
         self._webhooks: Optional[WebhooksResource] = None
 
@@ -120,6 +122,13 @@ class StarmoneyClient:
         if self._beneficiaries is None:
             self._beneficiaries = BeneficiariesResource(self._http_client)
         return self._beneficiaries
+
+    @property
+    def deferred_transfers(self) -> DeferredTransfersResource:
+        """Access deferred-transfers resource (send-to-handle flows)."""
+        if self._deferred_transfers is None:
+            self._deferred_transfers = DeferredTransfersResource(self._http_client)
+        return self._deferred_transfers
 
     @property
     def payments(self) -> PaymentsResource:
