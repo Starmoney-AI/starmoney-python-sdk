@@ -5,6 +5,7 @@ Wraps the bank service's send-to-a-phone/handle endpoints:
     POST /v1/deferred-transfers/send          — sender initiates
     GET  /v1/deferred-transfers/{id}          — status read
     POST /v1/deferred-transfers/{id}/claim    — recipient claim/settle
+    POST /v1/deferred-transfers/{id}/cancel   — sender cancels an un-claimed transfer
 
 Semantic model — the bank service reserves funds on the sender's vIBAN
 (``funding_source='viban_hold'``) or defers the pull until claim
@@ -140,6 +141,43 @@ class DeferredTransfersResource:
         response = await self.http.post(
             f"/deferred-transfers/{deferred_transfer_id}/claim",
             json=payload,
+            user_id=user_id,
+        )
+        return response.json()
+
+    async def cancel(
+        self,
+        user_id: str,
+        deferred_transfer_id: str,
+    ) -> dict[str, Any]:
+        """Cancel an un-claimed deferred transfer (sender only).
+
+        Only the sender may cancel. Bank enforces this via JWT — the caller
+        must authenticate as the same user_id that initiated the transfer;
+        otherwise the bank returns 404 (avoids leaking ownership).
+
+        Branch A (RESERVED): the send-time hold is released via the outbox,
+        restoring the sender's available amount immediately. Branch B
+        (ARMED): status moves to CANCELLED with no ledger touch.
+
+        State guard (CAS): cancel is allowed ONLY from ``RESERVED`` or
+        ``ARMED``. Any other status (``CLAIMED``, ``CLAIMED_PENDING_KYC``,
+        ``SETTLED``, ``EXPIRED``, ``RELEASED``, ``CANCELLED``) returns 409
+        from the bank with the current status in the response detail.
+        Idempotent: cancelling an already-``CANCELLED`` transfer returns
+        the current state without re-emitting the hold-release event.
+
+        Args:
+            user_id: Sender's StarMoney user_id (JWT-authenticated). Must
+                match the transfer's ``sender_user_id`` or the bank returns
+                404.
+            deferred_transfer_id: ``id`` returned by ``send``.
+
+        Returns:
+            DeferredTransfer response dict with the updated status.
+        """
+        response = await self.http.post(
+            f"/deferred-transfers/{deferred_transfer_id}/cancel",
             user_id=user_id,
         )
         return response.json()
