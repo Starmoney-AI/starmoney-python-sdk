@@ -154,18 +154,18 @@ class DeferredTransfersResource:
 
         Only the sender may cancel. Bank enforces this via JWT — the caller
         must authenticate as the same user_id that initiated the transfer;
-        otherwise the bank returns 404 (avoids leaking ownership).
+        otherwise the bank responds 404 (avoids leaking ownership), which the
+        SDK surfaces as ``PaymentNotFoundError``.
 
         Branch A (RESERVED): the send-time hold is released via the outbox,
         restoring the sender's available amount immediately. Branch B
         (ARMED): status moves to CANCELLED with no ledger touch.
 
         State guard (CAS): cancel is allowed ONLY from ``RESERVED`` or
-        ``ARMED``. Any other status (``CLAIMED``, ``CLAIMED_PENDING_KYC``,
-        ``SETTLED``, ``EXPIRED``, ``RELEASED``, ``CANCELLED``) returns 409
-        from the bank with the current status in the response detail.
+        ``ARMED``. Any other status returns HTTP 409 from the bank; the SDK
+        raises ``DuplicateResourceError`` with the bank's response body in
+        ``error_data`` (including the current status in ``detail``).
         Idempotent: cancelling an already-``CANCELLED`` transfer returns
-        the current state without re-emitting the hold-release event.
 
         Args:
             user_id: Sender's StarMoney user_id (JWT-authenticated). Must
