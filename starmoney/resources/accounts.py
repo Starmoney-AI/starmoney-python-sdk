@@ -11,9 +11,9 @@ class AccountsResource:
     Accounts resource for user account management.
 
     Handles:
-    - Creating user accounts
-    - Linking payment rails to accounts
-    - vIBAN provisioning
+    - Opening StarMoney accounts (home vIBAN provisioned inline by `create`)
+    - Linking OTHER payment rails to accounts (`link_rail`)
+    - Account-status enquiry (`get_status`)
     - KYC attestation submission
     - Profile management
     """
@@ -30,9 +30,16 @@ class AccountsResource:
         document_type: str,
         document_number: str,
         address: str,
+        viban_tenant_slug: Optional[str] = None,
     ) -> dict[str, Any]:
         """
-        Create a new user account.
+        Open a StarMoney account (and provision its home vIBAN by default).
+
+        The StarMoney account is the holder's identity record; provisioning the
+        home vIBAN is StarMoney's business, done inline here — it is NOT a
+        separate consumer call. To attach OTHER rails afterwards, use
+        ``link_rail``. The vIBAN is the home rail; you do not "provision a
+        vIBAN" as a public step.
 
         Args:
             first_name: User's first name
@@ -42,9 +49,20 @@ class AccountsResource:
             document_type: Document type (e.g., 'PASSPORT', 'ID_CARD')
             document_number: Document number
             address: User's address
+            viban_tenant_slug: Which vIBAN-ledgers tenant to provision the home
+                vIBAN in. Optional — when omitted the service resolves the sole
+                configured tenant. If no tenant is resolvable the holder is
+                created at CAPTURED (no vIBAN; e.g. BDK-only deployments).
 
         Returns:
-            Account data including user_id
+            dict with keys:
+              - user_id: The holder's ID (always present on success).
+              - account_state: 'active_pre_kyc' when the home vIBAN was
+                provisioned; 'captured' when it was not (bank-decision gate
+                declined / no vIBAN tenant) — branch your UX on this.
+              - account_reference: The home vIBAN reference when provisioned;
+                null at CAPTURED. StarMoney provisions the reference, never the
+                funds.
 
         Example:
             ```python
@@ -55,9 +73,12 @@ class AccountsResource:
                 phone_number="+1234567890",
                 document_type="PASSPORT",
                 document_number="AB123456",
-                address="123 Main St"
+                address="123 Main St",
+                viban_tenant_slug="solarbox",
             )
             user_id = account["user_id"]
+            if account["account_state"] == "active_pre_kyc":
+                viban = account["account_reference"]
             ```
         """
         payload = {
@@ -69,6 +90,8 @@ class AccountsResource:
             "document_number": document_number,
             "address": address,
         }
+        if viban_tenant_slug is not None:
+            payload["viban_tenant_slug"] = viban_tenant_slug
 
         response = await self.http.post("/accounts", json=payload)
         return response.json()
@@ -149,53 +172,37 @@ class AccountsResource:
         response = await self.http.get("/accounts/rails", user_id=user_id)
         return response.json()
 
-    async def provision_viban(
-        self,
-        viban_tenant_slug: str,
-        currency: str = "XOF",
-        holder_name: str = "Customer",
-        user_id: Optional[str] = None,
-    ) -> dict[str, Any]:
+    async def get_status(self, user_id: str) -> dict[str, Any]:
         """
-        Provision a vIBAN for the calling user.
+        Get the holder's account status (the KYC-assurance state machine).
 
-        Calls Eucalyptus synchronously, ACKs account_created + account_activated
-        in vIBAN-ledgers, then transitions the holder to ACTIVE_PRE_KYC. The bank
-        decides independently; a non-201 from Eucalyptus returns 502 to the caller.
+        Answers "what's the status of my account?" — is the home vIBAN live, is
+        KYC verified, is KYC still required. Returns STATE only; it never
+        returns a balance (positioning: state, not funds).
 
-        Auth: user-scoped JWT required. The endpoint resolves user_id from the JWT
-        sub claim server-side, so `user_id` must be provided here for the SDK to
-        mint the correct user-scoped token.
+        Auth: user-scoped JWT required. The endpoint resolves the user from the
+        JWT sub claim, so ``user_id`` must be provided for the SDK to mint the
+        correct user-scoped token.
 
         Args:
-            viban_tenant_slug: Which vIBAN-ledgers tenant the account belongs to.
-            currency: Currency code. Only 'XOF' is supported in v1.
-            holder_name: Declared identity passed to Eucalyptus. Not verified here.
             user_id: The authenticated user's ID (used to mint the JWT sub claim).
 
         Returns:
             dict with keys:
-              - account_reference: The vIBAN reference (StarMoney provisions the
-                reference, never the funds).
-              - upstream_account_id: Eucalyptus account UUID.
-              - account_state: Always 'active_pre_kyc' on success.
-              - correlation_id: Request correlation ID.
+              - user_id
+              - account_state: 'captured' | 'active_pre_kyc' | 'kyc_pending'
+                | 'verified' | 'closed'
+              - is_provisioned: bool — a home vIBAN is live (active_pre_kyc+)
+              - kyc_verified: bool — the bank has adjudicated KYC
+              - kyc_required: bool — the holder must KYC to lift the ceiling
+              - last_event: str | None
+              - updated_at: ISO datetime | None
 
         Raises:
-            ValidationError (400): viban_tenant_slug missing.
+            NotFoundError (404): no account state for this user.
             AuthenticationError (401): user_id missing or JWT invalid.
-            ServerError (502): Eucalyptus declined or vIBAN-ledgers ACK failed.
         """
-        payload = {
-            "viban_tenant_slug": viban_tenant_slug,
-            "currency": currency,
-            "holder_name": holder_name,
-        }
-        response = await self.http.post(
-            "/accounts/provision-viban",
-            json=payload,
-            user_id=user_id,
-        )
+        response = await self.http.get("/accounts/status", user_id=user_id)
         return response.json()
 
     async def submit_kyc(

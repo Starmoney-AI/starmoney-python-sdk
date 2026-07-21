@@ -5,10 +5,12 @@
 ### New features
 
 **Accounts resource**
-- `provision_viban(viban_tenant_slug, currency, holder_name, user_id)` — POST /v1/accounts/provision-viban. Provisions a vIBAN for the calling user via Eucalyptus, transitions holder to ACTIVE_PRE_KYC. Requires `user_id` for user-scoped JWT.
+- `create(..., viban_tenant_slug=None)` — POST /v1/accounts. **Opens a StarMoney account AND provisions its home vIBAN inline** (the vIBAN is the home rail — provisioning is StarMoney's business, not a separate consumer call). Returns `account_state` ('active_pre_kyc' when provisioned, 'captured' when the bank-decision gate declined or no tenant resolved) + `account_reference`. `viban_tenant_slug` is optional (server resolves the sole configured tenant when omitted).
+- `get_status(user_id)` — GET /v1/accounts/status. Account-status enquiry: returns the KYC-assurance state (`captured`/`active_pre_kyc`/`kyc_pending`/`verified`/`closed`) + derived flags (`is_provisioned`, `kyc_verified`, `kyc_required`). STATE only — never a balance.
 - `submit_kyc(user_id, attester, document_refs, idempotency_key, attested_at=None)` — POST /v1/accounts/{user_id}/kyc/submit. Submits an in-person KYC attestation; idempotent on `idempotency_key`.
 - `get_profile(user_id)` — GET /v1/accounts/profile.
 - `update_profile(user_id, *, email=None, phone_number=None, ...)` — PUT /v1/accounts/profile. Only provided (non-None) fields are sent.
+- **Removed `provision_viban`** from the public surface — `create` now provisions the home vIBAN. The `POST /v1/accounts/provision-viban` endpoint remains server-side for internal re-provision/retry, but is no longer a consumer-facing SDK verb.
 
 **Deferred Transfers resource (`client.deferred_transfers`)**
 New resource, added as `@property` on `StarmoneyClient`.

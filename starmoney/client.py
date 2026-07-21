@@ -38,7 +38,8 @@ class StarmoneyClient:
                 issuer="your-service-name",
                 base_url="https://api.starmoney.com/v1"
             ) as client:
-                # Create account
+                # Open a StarMoney account — the home vIBAN is provisioned
+                # inline by create (not a separate consumer call).
                 account = await client.accounts.create(
                     first_name="John",
                     last_name="Doe",
@@ -46,15 +47,12 @@ class StarmoneyClient:
                     phone_number="+221771234567",
                     document_type="PASSPORT",
                     document_number="AB123456",
-                    address="123 Main St"
+                    address="123 Main St",
+                    viban_tenant_slug="solarbox",
                 )
                 user_id = account["user_id"]
-
-                # Provision vIBAN
-                viban = await client.accounts.provision_viban(
-                    viban_tenant_slug="solarbox",
-                    holder_name="John Doe",
-                )
+                if account["account_state"] == "active_pre_kyc":
+                    viban = account["account_reference"]
 
                 # Send payment with UP3 mandates
                 result = await client.payments.send_with_mandates(
