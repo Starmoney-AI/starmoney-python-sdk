@@ -1,5 +1,24 @@
 # Changelog
 
+## [0.1.7] — 2026-07-23
+
+### Release hygiene — this is the real 0.1.6 surface, published under a fresh tag
+
+No API changes versus the intended 0.1.6 surface below. Version bump only, for
+a release-mechanics reason: the published `v0.1.6` tag is frozen at a stale
+commit (a deferred-transfers-only build predating the #69 accounts redesign and
+the UP3 surface), and the auto-publish tag step is idempotent — so it could
+never be moved onto the correct code. `0.1.7` ships the full accounts (#69) +
+UP3 + deferred-transfers + beneficiaries surface documented under 0.1.6, for
+real, under a fresh tag consumers can pin.
+
+- **Do not use `v0.1.6`** — it is a dead artifact pinned to old code.
+- Consumers pin `rev = "v0.1.7"` against `Starmoney-AI/starmoney-python-sdk`.
+
+The complete surface is unchanged from the 0.1.6 notes that follow.
+
+---
+
 ## [0.1.6] — 2026-06-22
 
 ### New features
