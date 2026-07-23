@@ -18,6 +18,7 @@ from .exceptions import (
     RateLimitError,
     ServerError,
     APIError,
+    UP3_ERROR_CODE_MAP,
 )
 
 
@@ -116,7 +117,20 @@ class HTTPClient:
             message = response.text or f"HTTP {response.status_code} error"
             error_data = {}
 
-        # Map status codes to exceptions
+        # Check for UP3 error codes embedded in the detail string or error_code field.
+        # The API returns UP3_* codes in either `detail` or an `error_code` field.
+        up3_code = error_data.get("error_code") if isinstance(error_data, dict) else None
+        if not up3_code and isinstance(message, str):
+            # Scan the message for a UP3_* prefix (e.g. "UP3_SIG_INVALID: ...")
+            for code in UP3_ERROR_CODE_MAP:
+                if code in message:
+                    up3_code = code
+                    break
+        if up3_code and up3_code in UP3_ERROR_CODE_MAP:
+            exc_cls = UP3_ERROR_CODE_MAP[up3_code]
+            raise exc_cls(message, error_data)
+
+        # Map HTTP status codes to domain exceptions
         if response.status_code == 400:
             raise ValidationError(response.status_code, message, error_data)
         elif response.status_code == 401:
@@ -125,6 +139,9 @@ class HTTPClient:
             raise PaymentNotFoundError(response.status_code, message, error_data)
         elif response.status_code == 409:
             raise DuplicateResourceError(response.status_code, message, error_data)
+        elif response.status_code == 410:
+            # 410 Gone is the UP3_EXPIRED HTTP code
+            raise APIError(response.status_code, message, error_data)
         elif response.status_code == 429:
             raise RateLimitError(response.status_code, message, error_data)
         elif response.status_code >= 500:

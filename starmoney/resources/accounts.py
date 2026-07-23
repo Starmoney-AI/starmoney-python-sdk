@@ -1,7 +1,8 @@
 """StarMoney SDK - Accounts Resource"""
 
-from typing import Any
-from typing import Dict
+from datetime import datetime
+from typing import Any, Dict, Optional
+
 from ..http_client import HTTPClient
 
 
@@ -10,8 +11,11 @@ class AccountsResource:
     Accounts resource for user account management.
 
     Handles:
-    - Creating user accounts
-    - Linking payment rails to accounts
+    - Opening StarMoney accounts (home vIBAN provisioned inline by `create`)
+    - Linking OTHER payment rails to accounts (`link_rail`)
+    - Account-status enquiry (`get_status`)
+    - KYC attestation submission
+    - Profile management
     """
 
     def __init__(self, http_client: HTTPClient):
@@ -26,9 +30,16 @@ class AccountsResource:
         document_type: str,
         document_number: str,
         address: str,
+        viban_tenant_slug: Optional[str] = None,
     ) -> dict[str, Any]:
         """
-        Create a new user account.
+        Open a StarMoney account (and provision its home vIBAN by default).
+
+        The StarMoney account is the holder's identity record; provisioning the
+        home vIBAN is StarMoney's business, done inline here — it is NOT a
+        separate consumer call. To attach OTHER rails afterwards, use
+        ``link_rail``. The vIBAN is the home rail; you do not "provision a
+        vIBAN" as a public step.
 
         Args:
             first_name: User's first name
@@ -38,9 +49,20 @@ class AccountsResource:
             document_type: Document type (e.g., 'PASSPORT', 'ID_CARD')
             document_number: Document number
             address: User's address
+            viban_tenant_slug: Which vIBAN-ledgers tenant to provision the home
+                vIBAN in. Optional — when omitted the service resolves the sole
+                configured tenant. If no tenant is resolvable the holder is
+                created at CAPTURED (no vIBAN; e.g. BDK-only deployments).
 
         Returns:
-            Account data including user_id
+            dict with keys:
+              - user_id: The holder's ID (always present on success).
+              - account_state: 'active_pre_kyc' when the home vIBAN was
+                provisioned; 'captured' when it was not (bank-decision gate
+                declined / no vIBAN tenant) — branch your UX on this.
+              - account_reference: The home vIBAN reference when provisioned;
+                null at CAPTURED. StarMoney provisions the reference, never the
+                funds.
 
         Example:
             ```python
@@ -51,9 +73,12 @@ class AccountsResource:
                 phone_number="+1234567890",
                 document_type="PASSPORT",
                 document_number="AB123456",
-                address="123 Main St"
+                address="123 Main St",
+                viban_tenant_slug="solarbox",
             )
             user_id = account["user_id"]
+            if account["account_state"] == "active_pre_kyc":
+                viban = account["account_reference"]
             ```
         """
         payload = {
@@ -65,6 +90,8 @@ class AccountsResource:
             "document_number": document_number,
             "address": address,
         }
+        if viban_tenant_slug is not None:
+            payload["viban_tenant_slug"] = viban_tenant_slug
 
         response = await self.http.post("/accounts", json=payload)
         return response.json()
@@ -118,7 +145,6 @@ class AccountsResource:
 
         return response.json()
 
-
     async def get_user_available_rails(self, user_id: str) -> Dict[str, Any]:
         """
         Get available payment rails for the authenticated user.
@@ -144,4 +170,150 @@ class AccountsResource:
             ```
         """
         response = await self.http.get("/accounts/rails", user_id=user_id)
+        return response.json()
+
+    async def get_status(self, user_id: str) -> dict[str, Any]:
+        """
+        Get the holder's account status (the KYC-assurance state machine).
+
+        Answers "what's the status of my account?" — is the home vIBAN live, is
+        KYC verified, is KYC still required. Returns STATE only; it never
+        returns a balance (positioning: state, not funds).
+
+        Auth: user-scoped JWT required. The endpoint resolves the user from the
+        JWT sub claim, so ``user_id`` must be provided for the SDK to mint the
+        correct user-scoped token.
+
+        Args:
+            user_id: The authenticated user's ID (used to mint the JWT sub claim).
+
+        Returns:
+            dict with keys:
+              - user_id
+              - account_state: 'captured' | 'active_pre_kyc' | 'kyc_pending'
+                | 'verified' | 'closed'
+              - is_provisioned: bool — a home vIBAN is live (active_pre_kyc+)
+              - kyc_verified: bool — the bank has adjudicated KYC
+              - kyc_required: bool — the holder must KYC to lift the ceiling
+              - last_event: str | None
+              - updated_at: ISO datetime | None
+
+        Raises:
+            NotFoundError (404): no account state for this user.
+            AuthenticationError (401): user_id missing or JWT invalid.
+        """
+        response = await self.http.get("/accounts/status", user_id=user_id)
+        return response.json()
+
+    async def submit_kyc(
+        self,
+        user_id: str,
+        attester: str,
+        document_refs: dict[str, str],
+        idempotency_key: str,
+        attested_at: Optional[datetime] = None,
+    ) -> dict[str, Any]:
+        """
+        Submit a KYC attestation for an ACTIVE_PRE_KYC account holder.
+
+        StarMoney captures the in-person identity check and records an opaque
+        document reference (no PII stored in this service). BDK adjudicates;
+        the ACTIVE_PRE_KYC -> KYC_PENDING transition is recorded append-only.
+
+        Idempotent: re-submitting the same idempotency_key returns the current
+        state without re-emitting.
+
+        Args:
+            user_id: The user whose KYC is being submitted (path parameter).
+            attester: Identity of the StarMoney operator performing the in-person
+                      check. Not the account holder.
+            document_refs: Opaque references / hashes pointing to documents in the
+                           KYC-document store. No PII here.
+            idempotency_key: Client-supplied idempotency key for the submission.
+            attested_at: UTC datetime when the in-person check was performed.
+                         Defaults to request time when omitted.
+
+        Returns:
+            dict with keys:
+              - user_id: str
+              - account_state: 'kyc_pending' on success; current state if already
+                past ACTIVE_PRE_KYC (idempotent).
+              - message: Human-readable status description.
+        """
+        payload: dict[str, Any] = {
+            "attester": attester,
+            "document_refs": document_refs,
+            "idempotency_key": idempotency_key,
+        }
+        if attested_at is not None:
+            payload["attested_at"] = attested_at.isoformat()
+
+        response = await self.http.post(
+            f"/accounts/{user_id}/kyc/submit",
+            json=payload,
+        )
+        return response.json()
+
+    async def get_profile(self, user_id: str) -> dict[str, Any]:
+        """
+        Get the current user's profile information.
+
+        Args:
+            user_id: User ID whose profile to retrieve (drives the JWT sub claim).
+
+        Returns:
+            UserProfileResponse dict with keys:
+              - user_id, first_name, last_name, email, phone_number,
+                kyc_status, document_type, document_number, address, created_at.
+        """
+        response = await self.http.get("/accounts/profile", user_id=user_id)
+        return response.json()
+
+    async def update_profile(
+        self,
+        user_id: str,
+        *,
+        email: Optional[str] = None,
+        phone_number: Optional[str] = None,
+        first_name: Optional[str] = None,
+        last_name: Optional[str] = None,
+        document_type: Optional[str] = None,
+        document_number: Optional[str] = None,
+        address: Optional[str] = None,
+    ) -> dict[str, Any]:
+        """
+        Update the current user's profile information.
+
+        Only the provided (non-None) fields are sent in the update request.
+
+        Args:
+            user_id: User ID to update (drives the JWT sub claim).
+            email: New email address.
+            phone_number: New phone number (E.164 format).
+            first_name: New first name.
+            last_name: New last name.
+            document_type: New document type.
+            document_number: New document number.
+            address: New address.
+
+        Returns:
+            Updated UserProfileResponse dict.
+        """
+        payload: dict[str, Any] = {}
+        if email is not None:
+            payload["email"] = email
+        if phone_number is not None:
+            payload["phone_number"] = phone_number
+        if first_name is not None:
+            payload["first_name"] = first_name
+        if last_name is not None:
+            payload["last_name"] = last_name
+        if document_type is not None:
+            payload["document_type"] = document_type
+        if document_number is not None:
+            payload["document_number"] = document_number
+        if address is not None:
+            payload["address"] = address
+
+        response = await self.http.put("/accounts/profile", json=payload, user_id=user_id)
         return response.json()

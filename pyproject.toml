@@ -1,12 +1,12 @@
 [tool.poetry]
 name = "starmoney-python"
-version = "0.1.5"
+version = "0.1.7"
 description = "Official Python SDK for StarMoney Bank API - Ultra-light async client"
 authors = ["StarMoney Team <dev@starmoney.com>"]
 license = "MIT"
 readme = "README.md"
 homepage = "https://starmoney.com"
-repository = "https://github.com/Cloudymlhub/starmoney-bank-service"
+repository = "https://github.com/Starmoney-AI/starmoney-python-sdk"
 keywords = ["fintech", "payments", "banking", "api", "sdk", "async"]
 packages = [{include = "starmoney"}]
 
@@ -15,6 +15,7 @@ python = "^3.10"
 httpx = ">=0.25.1,<0.26.0"
 pydantic = "^2.0"
 python-jose = {extras = ["cryptography"], version = "^3.3.0"}
+rfc8785 = "^0.1.2"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.0"
