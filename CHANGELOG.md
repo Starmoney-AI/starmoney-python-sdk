@@ -1,5 +1,36 @@
 # Changelog
 
+## [0.1.8] — 2026-07-23
+
+### Server-side rail selection (ADR-001) — `rail_name` is now an optional hint
+
+Rail selection moved server-side. StarMoney selects the funding/settlement rail;
+the caller no longer decides it. (Everything settles over BDK RTGS today; `VIBAN`
+vs `BDK` is whether the sender funds from their vIBAN.)
+
+- `payments.send_with_mandates(..., rail_name=None)` — `rail_name` is now **optional**.
+  Omit it and StarMoney routes: `VIBAN` when the sender can fund from their vIBAN,
+  else `BDK`. When provided it is a hint: `'BDK'` is honored; `'VIBAN'` is honored
+  only if the sender has a payable vIBAN, else the API returns 400. The response's
+  resolved rail tells you what was chosen.
+- `payments.send(..., rail_name=None)` — `rail_name` accepts `None`; omitted from the
+  request payload when not given.
+- `up3.build_cart(..., rail=None)` — `rail` is now **optional and omitted** from the
+  CartMandate payload when not supplied. Rail is orchestrator-owned and no longer
+  part of the user-signed cart; the backend stamps the executed rail onto the
+  PaymentMandate. `UP3_RAIL_DRIFT` is retired (the backend no longer enforces
+  `payment.rail == cart.rail`).
+
+Caller migration (adita `send_money`): call `send_with_mandates(...)` with **no
+`rail_name`**. This is the frozen contract in ADR-001 §7.
+
+### Also — rail example literal corrected (FIX-1)
+
+- Docstring examples that showed the non-resolving `"BDK_RTGS"` rail literal now
+  show `"BDK"`. `RailName("BDK_RTGS")` raises `ValueError` and 422s a live send;
+  the only valid literals are `"BDK"` (external) and `"VIBAN"` (sender funds from
+  their vIBAN). With ADR-001 you normally omit `rail_name` entirely.
+
 ## [0.1.7] — 2026-07-23
 
 ### Release hygiene — this is the real 0.1.6 surface, published under a fresh tag

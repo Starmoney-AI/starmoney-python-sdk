@@ -32,7 +32,7 @@ class PaymentsResource:
         beneficiary_iban: str,
         beneficiary_name: str,
         description: str,
-        rail_name: str,
+        rail_name: Optional[str],
         client_transaction_id: str,
         metadata: Optional[dict[str, Any]] = None,
         intent_mandate: Optional[dict[str, Any]] = None,
@@ -48,7 +48,9 @@ class PaymentsResource:
             beneficiary_iban: Recipient's IBAN.
             beneficiary_name: Recipient's name.
             description: Payment description.
-            rail_name: Payment rail to use (e.g., 'BDK').
+            rail_name: Optional routing hint (e.g. 'BDK', 'VIBAN'). Omit to let
+                       StarMoney select the rail (ADR-001) — VIBAN when the sender
+                       can fund from their vIBAN, else BDK.
             client_transaction_id: Idempotency key.
             metadata: Optional extra metadata dict.
             intent_mandate: Optional UP3 IntentMandate envelope (signed dict).
@@ -79,9 +81,12 @@ class PaymentsResource:
             "beneficiary_iban": beneficiary_iban,
             "beneficiary_name": beneficiary_name,
             "description": description,
-            "rail_name": rail_name,
             "client_transaction_id": client_transaction_id,
         }
+        # ADR-001: rail_name is an optional routing hint. Omit it when not given;
+        # StarMoney selects the rail server-side.
+        if rail_name is not None:
+            payload["rail_name"] = rail_name
         if metadata is not None:
             payload["metadata"] = metadata
         if intent_mandate is not None:
@@ -119,7 +124,7 @@ class PaymentsResource:
         beneficiary_iban: str,
         beneficiary_name: str,
         description: str,
-        rail_name: str,
+        rail_name: Optional[str] = None,
         user_ref: str,
         client_transaction_id: Optional[str] = None,
         consent_token: Optional[dict[str, Any]] = None,
@@ -149,8 +154,13 @@ class PaymentsResource:
             beneficiary_iban: Resolved recipient IBAN.
             beneficiary_name: Recipient display name.
             description: Human-readable description of the payment intent.
-            rail_name: Rail identifier matching the UP3 CartMandate `rail` field.
-                       Valid literals: 'BDK' (external) or 'VIBAN' (in-network).
+            rail_name: Optional routing hint (ADR-001). Omit it — StarMoney
+                       selects the rail (VIBAN when the sender can fund from their
+                       vIBAN, else BDK; all settling over BDK RTGS today) and
+                       stamps the executed rail onto the PaymentMandate. When
+                       provided: 'BDK' is honored; 'VIBAN' is honored only if the
+                       sender has a payable vIBAN, else the request is rejected
+                       (400). The signed CartMandate no longer carries a rail.
             user_ref: Stable user identifier (e.g. 'whatsapp:+221771234567').
             client_transaction_id: Idempotency key. Defaults to the cart mandate
                                    id (recommended per UP3 spec).

@@ -164,7 +164,7 @@ class UP3Resource:
         amount_minor: int,
         beneficiary_iban: str,
         beneficiary_name: str,
-        rail: str,
+        rail: Optional[str] = None,
         fees_minor: Optional[dict[str, int]] = None,
         confirmed_at: Optional[str] = None,
         consent_evidence: Optional[dict[str, Any]] = None,
@@ -184,7 +184,9 @@ class UP3Resource:
             amount_minor: Exact amount (not ceiling). Must be <= intent.max_amount_minor.
             beneficiary_iban: Resolved recipient IBAN.
             beneficiary_name: Display name for receipts.
-            rail: Rail identifier (e.g. 'BDK' or 'VIBAN'). Must match the payment rail.
+            rail: DEPRECATED / optional (ADR-001). Rail is orchestrator-owned and
+                  selected server-side; omit it. When None it is left out of the
+                  cart payload. Retained only for back-compat.
             fees_minor: Legged fee accounting dict (e.g. {"orchestrator": 50}).
                         Defaults to empty dict.
             confirmed_at: RFC 3339 Z-suffix timestamp of the user's tap.
@@ -210,6 +212,21 @@ class UP3Resource:
         now = _now_z()
         expires = _future_z(ttl_minutes)
 
+        payload: dict[str, Any] = {
+            "intent_mandate_id": intent_id,
+            "user_ref": intent_payload["user_ref"],
+            "amount_minor": amount_minor,
+            "currency": intent_payload["currency"],
+            "beneficiary_iban": beneficiary_iban,
+            "beneficiary_name": beneficiary_name,
+            "fees_minor": fees_minor,
+            "confirmed_at": confirmed_at,
+            "user_consent_evidence": consent_evidence,
+        }
+        # ADR-001: rail is orchestrator-owned. Only include it when the caller
+        # supplies a hint; StarMoney selects and stamps the executed rail.
+        if rail is not None:
+            payload["rail"] = rail
         envelope: dict[str, Any] = {
             "version": "0.1",
             "type": "cart",
@@ -217,18 +234,7 @@ class UP3Resource:
             "issued_at": now,
             "expires_at": expires,
             "issuer": self._issuer,
-            "payload": {
-                "intent_mandate_id": intent_id,
-                "user_ref": intent_payload["user_ref"],
-                "amount_minor": amount_minor,
-                "currency": intent_payload["currency"],
-                "beneficiary_iban": beneficiary_iban,
-                "beneficiary_name": beneficiary_name,
-                "rail": rail,
-                "fees_minor": fees_minor,
-                "confirmed_at": confirmed_at,
-                "user_consent_evidence": consent_evidence,
-            },
+            "payload": payload,
         }
         envelope["signature"] = sign(envelope, secret=self._secret)
         return envelope
