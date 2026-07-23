@@ -177,7 +177,7 @@ def test_build_cart_structure_and_chain():
         amount_minor=5000,
         beneficiary_iban="SN12K00100152000025690000754",
         beneficiary_name="Fatou Ndiaye",
-        rail="BDK_RTGS",
+        rail="BDK",
         fees_minor={"orchestrator": 50},
         confirmed_at=confirmed_at,
     )
@@ -190,7 +190,7 @@ def test_build_cart_structure_and_chain():
     assert payload["amount_minor"] == 5000
     assert payload["currency"] == "XOF"
     assert payload["beneficiary_iban"] == "SN12K00100152000025690000754"
-    assert payload["rail"] == "BDK_RTGS"
+    assert payload["rail"] == "BDK"
     assert payload["fees_minor"] == {"orchestrator": 50}
     assert payload["confirmed_at"] == confirmed_at
     # v0.1 default
@@ -211,7 +211,7 @@ def test_build_cart_signature_verifies():
         amount_minor=1000,
         beneficiary_iban="SN12K00100152000025690000754",
         beneficiary_name="Rec",
-        rail="BDK_RTGS",
+        rail="BDK",
     )
     assert verify(cart, secret=SECRET) is True
 
@@ -229,7 +229,7 @@ def test_build_cart_default_service_attestation():
         amount_minor=500,
         beneficiary_iban="SN12K00100152000025690000754",
         beneficiary_name="Rec",
-        rail="BDK_RTGS",
+        rail="BDK",
     )
     ev = cart["payload"]["user_consent_evidence"]
     assert ev["type"] == "service_attestation"
@@ -257,7 +257,7 @@ def _build_fake_payment_mandate(resource: UP3Resource, cart_id: str) -> dict:
         "payload": {
             "cart_mandate_id": cart_id,
             "client_transaction_id": cart_id,
-            "rail": "BDK_RTGS",
+            "rail": "BDK",
             "amount_minor": 5000,
             "currency": "XOF",
             "beneficiary_iban": "SN12K00100152000025690000754",

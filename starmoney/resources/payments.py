@@ -149,8 +149,8 @@ class PaymentsResource:
             beneficiary_iban: Resolved recipient IBAN.
             beneficiary_name: Recipient display name.
             description: Human-readable description of the payment intent.
-            rail_name: Rail identifier matching the UP3 CartMandate `rail` field
-                       (e.g. 'BDK_RTGS').
+            rail_name: Rail identifier matching the UP3 CartMandate `rail` field.
+                       Valid literals: 'BDK' (external) or 'VIBAN' (in-network).
             user_ref: Stable user identifier (e.g. 'whatsapp:+221771234567').
             client_transaction_id: Idempotency key. Defaults to the cart mandate
                                    id (recommended per UP3 spec).

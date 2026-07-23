@@ -105,7 +105,7 @@ async def test_send_with_mandates_raises_without_up3_resource():
             beneficiary_iban="SN12K00100152000025690000754",
             beneficiary_name="Fatou",
             description="Test",
-            rail_name="BDK_RTGS",
+            rail_name="BDK",
             user_ref="whatsapp:+221770000000",
         )
 
@@ -130,7 +130,7 @@ async def test_send_with_mandates_builds_and_submits_mandates():
         amount_minor=5000,
         beneficiary_iban="SN12K00100152000025690000754",
         beneficiary_name="Fatou",
-        rail="BDK_RTGS",
+        rail="BDK",
         fees_minor={},
         confirmed_at=confirmed_at,
     )
@@ -143,7 +143,7 @@ async def test_send_with_mandates_builds_and_submits_mandates():
     pm_payload = {
         "cart_mandate_id": cart["id"],
         "client_transaction_id": cart["id"],
-        "rail": "BDK_RTGS",
+        "rail": "BDK",
         "amount_minor": 5000,
         "currency": "XOF",
         "beneficiary_iban": "SN12K00100152000025690000754",
@@ -181,7 +181,7 @@ async def test_send_with_mandates_builds_and_submits_mandates():
         beneficiary_iban="SN12K00100152000025690000754",
         beneficiary_name="Fatou",
         description="Test",
-        rail_name="BDK_RTGS",
+        rail_name="BDK",
         user_ref="whatsapp:+221770000000",
     )
 

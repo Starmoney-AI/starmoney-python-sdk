@@ -62,7 +62,7 @@ class StarmoneyClient:
                     beneficiary_iban="SN12K00100152000025690000754",
                     beneficiary_name="Fatou Ndiaye",
                     description="send 5000 XOF to Fatou",
-                    rail_name="BDK_RTGS",
+                    rail_name="BDK",
                     user_ref="whatsapp:+221771234567",
                 )
         ```

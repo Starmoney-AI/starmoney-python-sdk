@@ -184,7 +184,7 @@ class UP3Resource:
             amount_minor: Exact amount (not ceiling). Must be <= intent.max_amount_minor.
             beneficiary_iban: Resolved recipient IBAN.
             beneficiary_name: Display name for receipts.
-            rail: Rail identifier (e.g. 'BDK_RTGS'). Must match the payment rail.
+            rail: Rail identifier (e.g. 'BDK' or 'VIBAN'). Must match the payment rail.
             fees_minor: Legged fee accounting dict (e.g. {"orchestrator": 50}).
                         Defaults to empty dict.
             confirmed_at: RFC 3339 Z-suffix timestamp of the user's tap.
