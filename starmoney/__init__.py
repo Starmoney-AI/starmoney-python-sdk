@@ -27,8 +27,8 @@ Quick Start:
             beneficiary_iban="SN12K00100152000025690000754",
             beneficiary_name="Fatou Ndiaye",
             description="send 5000 XOF to Fatou",
-            rail_name="BDK_RTGS",
             user_ref="whatsapp:+221771234567",
+            # rail is selected server-side (ADR-001) — no rail_name needed.
         )
 
         # Deferred transfer
@@ -77,7 +77,7 @@ from .exceptions import (
 )
 from .webhooks.validator import WebhookValidator
 
-__version__ = "0.1.6"
+__version__ = "0.1.8"
 __all__ = [
     "StarmoneyClient",
     "WebhookValidator",
