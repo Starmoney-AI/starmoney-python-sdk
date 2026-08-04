@@ -1,5 +1,27 @@
 # Changelog
 
+## [0.1.9] — 2026-08-04
+
+### List a sender's deferred transfers (ADR-003) — enables the cancel pick-list
+
+New read method so a consumer (adita) can show a user their cancellable transfers
+to pick from, instead of asking them to type an opaque `deferred_transfer_id`.
+
+- `deferred_transfers.list(user_id, status=None, limit=20, offset=0)` — lists the
+  transfers the caller **sent** (sender-scoped: only rows where JWT `sub` ==
+  `sender_user_id`, same ownership rule as `cancel`; a caller can never enumerate
+  another user's transfers). Mirrors `GET /v1/deferred-transfers`.
+  - `status` is an optional comma-list (e.g. `"reserved,armed"`); when omitted the
+    API defaults to the **cancellable** set (`reserved`, `armed`) so the common
+    "what can I cancel?" call needs no params.
+  - Each row carries `deferred_transfer_id`, `recipient_handle` (**MASKED**, e.g.
+    `+2217xxxxxx99` — enough to disambiguate a pick-list without re-exposing full
+    PII), `amount_minor`, `currency`, `status`, `created_at`, `expires_at`. No
+    balance/available field (positioning: per-transfer state, never funds).
+
+Consumer flow: `list(...)` → render pick-rows → user taps one → existing
+`cancel(deferred_transfer_id, user_id)`. No new cancel behaviour.
+
 ## [0.1.8] — 2026-07-23
 
 ### Server-side rail selection (ADR-001) — `rail_name` is now an optional hint
