@@ -121,6 +121,71 @@ async def test_get_calls_correct_path():
 
 
 # ---------------------------------------------------------------------------
+# list
+# ---------------------------------------------------------------------------
+
+
+_LIST_RESPONSE = {
+    "user_id": "user-1",
+    "limit": 20,
+    "offset": 0,
+    "deferred_transfers": [
+        {
+            "deferred_transfer_id": "dt-uuid-1",
+            "recipient_handle": "+2217xxxxxx01",
+            "amount_minor": 5000,
+            "currency": "XOF",
+            "status": "reserved",
+            "created_at": "2026-08-04T09:00:00Z",
+            "expires_at": "2026-08-11T09:00:00Z",
+        }
+    ],
+}
+
+
+@pytest.mark.asyncio
+async def test_list_default_params_and_user_scoped():
+    resource, http = _make_resource()
+    mock_resp = MagicMock()
+    mock_resp.json.return_value = _LIST_RESPONSE
+    http.get = AsyncMock(return_value=mock_resp)
+
+    result = await resource.list(user_id="user-1")
+
+    http.get.assert_called_once_with(
+        "/deferred-transfers",
+        user_id="user-1",
+        params={"limit": 20, "offset": 0},
+    )
+    # No status param unless supplied (API defaults to the cancellable set).
+    assert "status" not in http.get.call_args.kwargs["params"]
+    assert result["deferred_transfers"][0]["deferred_transfer_id"] == "dt-uuid-1"
+    # Handle is masked in the response the SDK returns to the caller.
+    assert "x" in result["deferred_transfers"][0]["recipient_handle"]
+
+
+@pytest.mark.asyncio
+async def test_list_forwards_status_filter_and_pagination():
+    resource, http = _make_resource()
+    mock_resp = MagicMock()
+    mock_resp.json.return_value = _LIST_RESPONSE
+    http.get = AsyncMock(return_value=mock_resp)
+
+    await resource.list(
+        user_id="user-1",
+        status="reserved,armed",
+        limit=50,
+        offset=100,
+    )
+
+    http.get.assert_called_once_with(
+        "/deferred-transfers",
+        user_id="user-1",
+        params={"limit": 50, "offset": 100, "status": "reserved,armed"},
+    )
+
+
+# ---------------------------------------------------------------------------
 # claim
 # ---------------------------------------------------------------------------
 

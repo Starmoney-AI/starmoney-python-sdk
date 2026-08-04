@@ -1,7 +1,8 @@
 """StarMoney SDK - Deferred Transfers Resource
 
-Mirrors POST /v1/deferred-transfers/send, GET /v1/deferred-transfers/{id},
-POST /v1/deferred-transfers/{id}/claim, POST /v1/deferred-transfers/{id}/cancel.
+Mirrors POST /v1/deferred-transfers/send, GET /v1/deferred-transfers (list),
+GET /v1/deferred-transfers/{id}, POST /v1/deferred-transfers/{id}/claim,
+POST /v1/deferred-transfers/{id}/cancel.
 """
 
 from typing import Any, Literal, Optional
@@ -81,6 +82,48 @@ class DeferredTransfersResource:
 
         # user_id is resolved server-side from the JWT sub claim.
         response = await self.http.post("/deferred-transfers/send", json=payload)
+        return response.json()
+
+    async def list(
+        self,
+        user_id: str,
+        status: Optional[str] = None,
+        limit: int = 20,
+        offset: int = 0,
+    ) -> dict[str, Any]:
+        """
+        List the caller's deferred transfers (sender-scoped) — for a cancel pick-list.
+
+        Returns only transfers the caller SENT (JWT sub == sender_user_id), so a
+        caller can never enumerate another user's transfers (same ownership rule
+        as cancel). Use this to render a "what can I cancel?" pick-list, then call
+        cancel() with the chosen deferred_transfer_id.
+
+        Args:
+            user_id: The authenticated sender's user ID (drives the JWT sub claim).
+            status: Optional comma-separated status filter (e.g. "reserved,armed").
+                    When omitted, the API defaults to the cancellable set
+                    (reserved, armed). Valid values: reserved, armed, claimed,
+                    claimed_pending_kyc, settled, expired, released, cancelled.
+            limit: Max transfers to return (default 20, capped at 100 server-side).
+            offset: Number of transfers to skip (pagination).
+
+        Returns:
+            Dict with keys:
+              user_id, limit, offset, deferred_transfers (list). Each item has:
+              deferred_transfer_id, recipient_handle (MASKED, e.g. '+2217xxxxxx99'),
+              amount_minor, currency, status, created_at, expires_at.
+
+        Raises:
+            ValidationError (422): Unknown status token in the filter.
+        """
+        params: dict[str, Any] = {"limit": limit, "offset": offset}
+        if status is not None:
+            params["status"] = status
+
+        response = await self.http.get(
+            "/deferred-transfers", user_id=user_id, params=params
+        )
         return response.json()
 
     async def get(self, deferred_transfer_id: str) -> dict[str, Any]:
