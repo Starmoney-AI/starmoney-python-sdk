@@ -209,3 +209,48 @@ async def test_update_profile_calls_put_endpoint():
     path = http.put.call_args.args[0]
     assert path == "/accounts/profile"
     assert http.put.call_args.kwargs["user_id"] == "user-1"
+
+
+@pytest.mark.asyncio
+async def test_create_forwards_client_reference_when_provided():
+    """ADR-004: client_reference is forwarded to the API so it can be echoed
+    back on the account-lifecycle webhooks."""
+    resource, http = _make_resource()
+    mock_resp = MagicMock()
+    mock_resp.json.return_value = {"user_id": "user-3", "account_state": "active_pre_kyc"}
+    http.post = AsyncMock(return_value=mock_resp)
+
+    await resource.create(
+        first_name="Awa",
+        last_name="Sow",
+        email="awa@example.com",
+        phone_number="+221770000000",
+        document_type="ID_CARD",
+        document_number="CNI-1",
+        address="Thiès",
+        client_reference="bot_557712",
+    )
+
+    sent = http.post.call_args.kwargs["json"]
+    assert sent["client_reference"] == "bot_557712"
+
+
+@pytest.mark.asyncio
+async def test_create_omits_client_reference_when_not_provided():
+    resource, http = _make_resource()
+    mock_resp = MagicMock()
+    mock_resp.json.return_value = {"user_id": "user-4", "account_state": "captured"}
+    http.post = AsyncMock(return_value=mock_resp)
+
+    await resource.create(
+        first_name="Awa",
+        last_name="Sow",
+        email="awa@example.com",
+        phone_number="+221770000000",
+        document_type="ID_CARD",
+        document_number="CNI-1",
+        address="Thiès",
+    )
+
+    sent = http.post.call_args.kwargs["json"]
+    assert "client_reference" not in sent
