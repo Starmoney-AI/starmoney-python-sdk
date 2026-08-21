@@ -77,7 +77,18 @@ from .exceptions import (
 )
 from .webhooks.validator import WebhookValidator
 
-__version__ = "0.1.9"
+# Single source of truth: derive the version from the installed distribution
+# metadata (populated from pyproject.toml at build/install time) so __version__
+# can never drift from the packaged version. A hardcoded dunder previously went
+# stale when pyproject was bumped but this line wasn't. The fallback only fires
+# when running from an uninstalled source tree.
+try:
+    from importlib.metadata import PackageNotFoundError
+    from importlib.metadata import version as _pkg_version
+
+    __version__ = _pkg_version("starmoney-python")
+except PackageNotFoundError:  # running from an uninstalled source checkout
+    __version__ = "0.0.0+source"
 __all__ = [
     "StarmoneyClient",
     "WebhookValidator",

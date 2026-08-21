@@ -254,3 +254,23 @@ async def test_create_omits_client_reference_when_not_provided():
 
     sent = http.post.call_args.kwargs["json"]
     assert "client_reference" not in sent
+
+
+# ---------------------------------------------------------------------------
+# Version drift guard (adita report): __version__ must equal the packaged
+# distribution version — never a separately-hardcoded string that can go stale.
+# ---------------------------------------------------------------------------
+
+
+def test_version_matches_distribution_metadata():
+    from importlib.metadata import version as _pkg_version
+
+    import starmoney
+
+    assert starmoney.__version__ == _pkg_version("starmoney-python"), (
+        "starmoney.__version__ drifted from the installed distribution version; "
+        "it must derive from importlib.metadata, not a hardcoded dunder"
+    )
+    assert starmoney.__version__ != "0.0.0+source", (
+        "package appears uninstalled in the test env; cannot validate version"
+    )
