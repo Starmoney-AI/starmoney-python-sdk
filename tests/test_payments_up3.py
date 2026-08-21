@@ -225,3 +225,50 @@ def test_up3_exceptions_have_correct_code_attr():
     assert UP3SchemaInvalid().code == "UP3_SCHEMA_INVALID"
     assert UP3Replay().code == "UP3_REPLAY"
     assert UP3Expired().code == "UP3_EXPIRED"
+
+
+# ---------------------------------------------------------------------------
+# ADR-004 — client_reference forwarded
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_send_forwards_client_reference():
+    resource, http = _make_payments_with_up3()
+    mock_resp = MagicMock()
+    mock_resp.json.return_value = {"transaction_id": "t", "status": "PENDING"}
+    http.post = AsyncMock(return_value=mock_resp)
+
+    await resource.send(
+        user_id="user-1",
+        amount=5000,
+        currency="XOF",
+        beneficiary_iban="SN12K00100152000025690000754",
+        beneficiary_name="Fatou",
+        description="Test",
+        rail_name="BDK",
+        client_transaction_id="cid-1",
+        client_reference="bot_557712",
+    )
+    called_json = http.post.call_args.kwargs["json"]
+    assert called_json["client_reference"] == "bot_557712"
+
+
+@pytest.mark.asyncio
+async def test_send_omits_client_reference_when_not_provided():
+    resource, http = _make_payments_with_up3()
+    mock_resp = MagicMock()
+    mock_resp.json.return_value = {"transaction_id": "t", "status": "PENDING"}
+    http.post = AsyncMock(return_value=mock_resp)
+
+    await resource.send(
+        user_id="user-1",
+        amount=5000,
+        currency="XOF",
+        beneficiary_iban="SN12K00100152000025690000754",
+        beneficiary_name="Fatou",
+        description="Test",
+        rail_name="BDK",
+        client_transaction_id="cid-1",
+    )
+    assert "client_reference" not in http.post.call_args.kwargs["json"]

@@ -33,6 +33,7 @@ class DeferredTransfersResource:
         currency: Literal["XOF"] = "XOF",
         funding_source: Literal["viban_hold", "external_pull"] = "viban_hold",
         linked_external_account_id: Optional[str] = None,
+        client_reference: Optional[str] = None,
     ) -> dict[str, Any]:
         """
         Create a deferred-trigger transfer (send-half).
@@ -79,6 +80,8 @@ class DeferredTransfersResource:
         }
         if linked_external_account_id is not None:
             payload["linked_external_account_id"] = linked_external_account_id
+        if client_reference is not None:
+            payload["client_reference"] = client_reference
 
         # user_id is resolved server-side from the JWT sub claim.
         response = await self.http.post("/deferred-transfers/send", json=payload)
