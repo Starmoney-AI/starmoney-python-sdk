@@ -31,6 +31,7 @@ class AccountsResource:
         document_number: str,
         address: str,
         viban_tenant_slug: Optional[str] = None,
+        client_reference: Optional[str] = None,
     ) -> dict[str, Any]:
         """
         Open a StarMoney account (and provision its home vIBAN by default).
@@ -53,6 +54,13 @@ class AccountsResource:
                 vIBAN in. Optional — when omitted the service resolves the sole
                 configured tenant. If no tenant is resolvable the holder is
                 created at CAPTURED (no vIBAN; e.g. BDK-only deployments).
+            client_reference: Optional opaque routing reference (ADR-004),
+                echoed back verbatim on this account's lifecycle webhooks
+                (account.opened / account.kyc.verified / account.kyc.review_required)
+                so a multi-tenant consumer can correlate the event to its own
+                context (e.g. which bot owns the conversation). Treated as opaque
+                by StarMoney and delivered only back to the calling service.
+                MUST NOT contain PII — it is a routing token, not user data.
 
         Returns:
             dict with keys:
@@ -92,6 +100,8 @@ class AccountsResource:
         }
         if viban_tenant_slug is not None:
             payload["viban_tenant_slug"] = viban_tenant_slug
+        if client_reference is not None:
+            payload["client_reference"] = client_reference
 
         response = await self.http.post("/accounts", json=payload)
         return response.json()

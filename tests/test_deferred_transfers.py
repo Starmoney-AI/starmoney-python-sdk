@@ -254,3 +254,24 @@ async def test_cancel_calls_correct_path_with_user_id():
         user_id="user-1",
     )
     assert result["status"] == "cancelled"
+
+
+@pytest.mark.asyncio
+async def test_send_forwards_client_reference():
+    from unittest.mock import AsyncMock, MagicMock
+
+    from starmoney.resources.deferred_transfers import DeferredTransfersResource
+
+    http = MagicMock()
+    resource = DeferredTransfersResource(http)
+    mock_resp = MagicMock()
+    mock_resp.json.return_value = {"id": "dt-1", "status": "reserved"}
+    http.post = AsyncMock(return_value=mock_resp)
+
+    await resource.send(
+        client_transaction_id="cid-1",
+        recipient_handle="+221770000000",
+        amount_minor=3000,
+        client_reference="bot_557712",
+    )
+    assert http.post.call_args.kwargs["json"]["client_reference"] == "bot_557712"

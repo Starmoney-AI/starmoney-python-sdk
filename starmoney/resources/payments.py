@@ -35,6 +35,7 @@ class PaymentsResource:
         rail_name: Optional[str],
         client_transaction_id: str,
         metadata: Optional[dict[str, Any]] = None,
+        client_reference: Optional[str] = None,
         intent_mandate: Optional[dict[str, Any]] = None,
         cart_mandate: Optional[dict[str, Any]] = None,
     ) -> dict[str, Any]:
@@ -89,6 +90,8 @@ class PaymentsResource:
             payload["rail_name"] = rail_name
         if metadata is not None:
             payload["metadata"] = metadata
+        if client_reference is not None:
+            payload["client_reference"] = client_reference
         if intent_mandate is not None:
             payload["intent_mandate"] = intent_mandate
         if cart_mandate is not None:
@@ -127,6 +130,7 @@ class PaymentsResource:
         rail_name: Optional[str] = None,
         user_ref: str,
         client_transaction_id: Optional[str] = None,
+        client_reference: Optional[str] = None,
         consent_token: Optional[dict[str, Any]] = None,
         fees_minor: Optional[dict[str, int]] = None,
         intent_ttl_minutes: int = 15,
@@ -227,6 +231,7 @@ class PaymentsResource:
             description=description,
             rail_name=rail_name,
             client_transaction_id=txn_id,
+            client_reference=client_reference,
             intent_mandate=intent,
             cart_mandate=cart,
         )
