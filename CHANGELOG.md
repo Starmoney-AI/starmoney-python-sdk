@@ -1,5 +1,27 @@
 # Changelog
 
+## [0.1.12] — 2026-08-28
+
+### Webhook event catalog + typed payloads (transfer notifications, PR #101)
+
+Discoverable, typo-safe constants for every subscribable webhook event, and
+typed payloads for the two newest ones — no behavior change, purely additive.
+
+- `starmoney.webhooks.WebhookEvent` — a `str` enum covering the full
+  16-event broadcastable catalog (payment lifecycle, UP3 Mandate audit,
+  deferred transfer, account lifecycle, inbound credit), including the two
+  events added by the transfer-notifications work:
+  - `WebhookEvent.DEFERRED_TRANSFER_SENT` ("deferred_transfer.sent") — "money
+    is waiting for a recipient who has no account yet".
+  - `WebhookEvent.PAYMENT_RECEIVED` ("payment.received") — "you received
+    money" (ordinary inbound credit).
+- `starmoney.webhooks.DeferredTransferSentPayload` /
+  `PaymentReceivedPayload` — `TypedDict`s matching the exact flat delivered
+  webhook body for these two events (editor/type-checker help only; no
+  runtime validation — verify the HMAC signature first).
+- `resources/webhooks.py` docstring examples updated to use `WebhookEvent`
+  constants and demonstrate subscribing to both new events.
+
 ## [0.1.9] — 2026-08-04
 
 ### List a sender's deferred transfers (ADR-003) — enables the cancel pick-list

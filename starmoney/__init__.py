@@ -41,10 +41,12 @@ Quick Start:
 
 Webhook Validation:
     ```python
-    from starmoney.webhooks import WebhookValidator
+    from starmoney.webhooks import WebhookEvent, WebhookValidator
 
     validator = WebhookValidator(webhook_secret="your-secret")
     event = validator.parse_webhook(payload, signature)
+    if event["event_type"] == WebhookEvent.PAYMENT_RECEIVED:
+        ...
     ```
 """
 
@@ -75,6 +77,8 @@ from .exceptions import (
     UP3StatusInvalid,
     UP3TypeNotAccepted,
 )
+from .webhooks.events import WebhookEvent
+from .webhooks.payloads import DeferredTransferSentPayload, PaymentReceivedPayload
 from .webhooks.validator import WebhookValidator
 
 # Single source of truth: derive the version from the installed distribution
@@ -92,6 +96,9 @@ except PackageNotFoundError:  # running from an uninstalled source checkout
 __all__ = [
     "StarmoneyClient",
     "WebhookValidator",
+    "WebhookEvent",
+    "DeferredTransferSentPayload",
+    "PaymentReceivedPayload",
     # Base exceptions
     "StarmoneyError",
     "APIError",

@@ -39,13 +39,19 @@ class WebhooksResource:
 
         Example:
             ```python
+            from starmoney.webhooks import WebhookEvent
+
             result = await client.webhooks.batch_subscribe(
                 endpoint_url="https://yourapp.com/webhooks",
                 webhook_secret="your-webhook-secret",
                 event_subscriptions=[
-                    {"event_type": "payment.initiated", "subscribed_users": None},
-                    {"event_type": "payment.completed", "subscribed_users": None},
-                    {"event_type": "payment.failed", "subscribed_users": None},
+                    {"event_type": WebhookEvent.PAYMENT_INITIATED, "subscribed_users": None},
+                    {"event_type": WebhookEvent.PAYMENT_COMPLETED, "subscribed_users": None},
+                    {"event_type": WebhookEvent.PAYMENT_FAILED, "subscribed_users": None},
+                    # New (PR #101): "money is waiting for a recipient who has no
+                    # account yet" / "you received money".
+                    {"event_type": WebhookEvent.DEFERRED_TRANSFER_SENT, "subscribed_users": None},
+                    {"event_type": WebhookEvent.PAYMENT_RECEIVED, "subscribed_users": None},
                 ],
                 retry_attempts=3,
                 timeout_seconds=10
@@ -80,13 +86,36 @@ class WebhooksResource:
         Args:
             endpoint_url: URL where webhooks will be delivered
             webhook_secret: Secret for HMAC signature validation
-            event_type: Event type to subscribe to (e.g., 'payment.completed')
+            event_type: Event type to subscribe to — use a
+                ``starmoney.webhooks.WebhookEvent`` constant (e.g.
+                ``WebhookEvent.PAYMENT_COMPLETED``) instead of a raw string to
+                avoid typos; a plain string like ``'payment.completed'`` also
+                works since ``WebhookEvent`` members ARE strings.
             subscribed_users: Optional list of user IDs to filter events
             retry_attempts: Number of retry attempts for failed deliveries
             timeout_seconds: Webhook delivery timeout
 
         Returns:
             Subscription data
+
+        Example:
+            ```python
+            from starmoney.webhooks import WebhookEvent
+
+            # "money is waiting for a recipient who has no account yet" (PR #101)
+            await client.webhooks.create_subscription(
+                endpoint_url="https://yourapp.com/webhooks",
+                webhook_secret="your-webhook-secret",
+                event_type=WebhookEvent.DEFERRED_TRANSFER_SENT,
+            )
+
+            # "you received money" (PR #101)
+            await client.webhooks.create_subscription(
+                endpoint_url="https://yourapp.com/webhooks",
+                webhook_secret="your-webhook-secret",
+                event_type=WebhookEvent.PAYMENT_RECEIVED,
+            )
+            ```
         """
         payload = {
             "endpoint_url": endpoint_url,
