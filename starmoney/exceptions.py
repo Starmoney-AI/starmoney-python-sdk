@@ -47,9 +47,33 @@ class PaymentNotFoundError(APIError):
 
 
 class DuplicateResourceError(APIError):
-    """409 - Resource already exists (e.g., duplicate payment)."""
+    """409 - Resource already exists (e.g., duplicate payment or beneficiary).
+
+    For beneficiaries the server returns ``error_code == "DUPLICATE_BENEFICIARY"``
+    alongside the 409.
+    """
 
     pass
+
+
+class InvalidIBANError(APIError):
+    """422 - IBAN failed validation (bad format/length or mod-97 checksum).
+
+    Raised both client-side (fast-fail before the request, from
+    ``beneficiaries.create``/``update``) and when the server responds with
+    ``error_code == "INVALID_IBAN"``. Distinguishable from
+    ``DuplicateResourceError`` (duplicate), ``AuthenticationError``
+    (unauthorized), and a generic ``APIError``, so a caller can tell the user
+    to correct the IBAN before anything is persisted.
+    """
+
+    def __init__(
+        self,
+        message: str = "Invalid IBAN",
+        response_data: Optional[dict[str, Any]] = None,
+        status_code: int = 422,
+    ):
+        super().__init__(status_code, message, response_data)
 
 
 class RateLimitError(APIError):

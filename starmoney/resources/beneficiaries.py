@@ -2,6 +2,8 @@
 
 from typing import Any, Optional
 
+from .._iban import is_valid_iban
+from ..exceptions import InvalidIBANError
 from ..http_client import HTTPClient
 
 
@@ -48,9 +50,17 @@ class BeneficiariesResource:
               is_active, metadata, created_at, updated_at.
 
         Raises:
-            ValidationError (422): Invalid IBAN format or phone number.
+            InvalidIBANError (422): IBAN failed format/length or mod-97 checksum
+                (raised client-side before the request, and by the server).
             DuplicateResourceError (409): Duplicate beneficiary for this user.
+            ValidationError (400): Other invalid request data.
         """
+        # Fast-fail on a bad IBAN before the round-trip. Full ISO 13616 mod-97,
+        # so a mistyped-but-well-formed IBAN is caught here too. The server
+        # re-validates — this is a convenience, not the source of truth.
+        if not is_valid_iban(iban):
+            raise InvalidIBANError(f"Invalid IBAN: {iban!r} failed mod-97 validation")
+
         payload: dict[str, Any] = {
             "name": name,
             "iban": iban,
@@ -155,8 +165,12 @@ class BeneficiariesResource:
 
         Raises:
             PaymentNotFoundError (404): Beneficiary not found.
-            ValidationError (422): Invalid IBAN or phone number.
+            InvalidIBANError (422): New IBAN failed mod-97 validation.
+            DuplicateResourceError (409): New IBAN already exists for this user.
         """
+        if iban is not None and not is_valid_iban(iban):
+            raise InvalidIBANError(f"Invalid IBAN: {iban!r} failed mod-97 validation")
+
         payload: dict[str, Any] = {}
         if name is not None:
             payload["name"] = name
