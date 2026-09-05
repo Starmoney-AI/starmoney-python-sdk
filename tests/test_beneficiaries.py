@@ -16,7 +16,7 @@ def _make_resource():
 _BENE_RESPONSE = {
     "id": "bene-uuid-1",
     "name": "Fatou Ndiaye",
-    "iban": "SN12K00100152000025690000754",
+    "iban": "SN12K00100152000025690007542",
     "phone_number": None,
     "email": None,
     "bank_name": "BDK",
@@ -43,12 +43,12 @@ async def test_create_sends_required_fields():
     result = await resource.create(
         user_id="user-1",
         name="Fatou Ndiaye",
-        iban="SN12K00100152000025690000754",
+        iban="SN12K00100152000025690007542",
     )
 
     called_json = http.post.call_args.kwargs["json"]
     assert called_json["name"] == "Fatou Ndiaye"
-    assert called_json["iban"] == "SN12K00100152000025690000754"
+    assert called_json["iban"] == "SN12K00100152000025690007542"
     assert called_json["is_favorite"] is False
     assert result["id"] == "bene-uuid-1"
 
@@ -63,7 +63,7 @@ async def test_create_includes_optional_fields():
     await resource.create(
         user_id="user-1",
         name="Fatou Ndiaye",
-        iban="SN12K00100152000025690000754",
+        iban="SN12K00100152000025690007542",
         bank_name="BDK",
         phone_number="+221770000001",
         email="fatou@example.com",
@@ -216,16 +216,104 @@ async def test_validate_iban_sends_query_param():
     resource, http = _make_resource()
     mock_resp = MagicMock()
     mock_resp.json.return_value = {
-        "iban": "SN12K00100152000025690000754",
+        "iban": "SN12K00100152000025690007542",
         "is_valid": True,
         "message": "IBAN format is valid",
     }
     http.get = AsyncMock(return_value=mock_resp)
 
-    result = await resource.validate_iban("SN12K00100152000025690000754")
+    result = await resource.validate_iban("SN12K00100152000025690007542")
 
     http.get.assert_called_once_with(
         "/beneficiaries/validate/iban",
-        params={"iban": "SN12K00100152000025690000754"},
+        params={"iban": "SN12K00100152000025690007542"},
     )
     assert result["is_valid"] is True
+
+
+# ---------------------------------------------------------------------------
+# IBAN validation: client-side fast-fail + server error-code mapping
+# ---------------------------------------------------------------------------
+
+from starmoney.auth import AuthManager
+from starmoney.exceptions import DuplicateResourceError, InvalidIBANError
+from starmoney.http_client import HTTPClient
+
+
+class _FakeResponse:
+    """Minimal stand-in for httpx.Response for _handle_error."""
+
+    def __init__(self, status_code, body):
+        self.status_code = status_code
+        self._body = body
+        self.text = str(body)
+
+    def json(self):
+        return self._body
+
+
+def _client():
+    return HTTPClient(
+        base_url="http://test.local",
+        auth=AuthManager("test-secret-at-least-32-characters-long!!"),
+    )
+
+
+@pytest.mark.asyncio
+async def test_create_rejects_bad_checksum_client_side():
+    """A well-formed but mod-97-invalid IBAN fails before any HTTP call."""
+    resource, http = _make_resource()
+    http.post = AsyncMock()
+
+    # ...188 is one digit off from the valid ...189 — passes format, fails mod-97.
+    with pytest.raises(InvalidIBANError):
+        await resource.create(
+            user_id="u1", name="Typo Payee", iban="FR7630006000011234567890188"
+        )
+    http.post.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_create_rejects_malformed_iban_client_side():
+    resource, http = _make_resource()
+    http.post = AsyncMock()
+    with pytest.raises(InvalidIBANError):
+        await resource.create(user_id="u1", name="Bad", iban="NOT-AN-IBAN")
+    http.post.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_update_rejects_bad_iban_client_side():
+    resource, http = _make_resource()
+    http.put = AsyncMock()
+    with pytest.raises(InvalidIBANError):
+        await resource.update(
+            user_id="u1", beneficiary_id="b1", iban="FR7630006000011234567890188"
+        )
+    http.put.assert_not_called()
+
+
+def test_handle_error_maps_invalid_iban_error_code():
+    """Server 422 with nested error_code INVALID_IBAN -> InvalidIBANError."""
+    client = _client()
+    resp = _FakeResponse(
+        422,
+        {"detail": {"message": "Invalid IBAN checksum (mod-97 failed)", "error_code": "INVALID_IBAN"}},
+    )
+    with pytest.raises(InvalidIBANError) as ei:
+        client._handle_error(resp)
+    # message is unwrapped from the nested detail object
+    assert "mod-97" in str(ei.value)
+    assert ei.value.status_code == 422
+
+
+def test_handle_error_maps_duplicate_beneficiary_409():
+    """Server 409 -> DuplicateResourceError, with the human message extracted."""
+    client = _client()
+    resp = _FakeResponse(
+        409,
+        {"detail": {"message": "Beneficiary with IBAN X already exists", "error_code": "DUPLICATE_BENEFICIARY"}},
+    )
+    with pytest.raises(DuplicateResourceError) as ei:
+        client._handle_error(resp)
+    assert "already exists" in str(ei.value)

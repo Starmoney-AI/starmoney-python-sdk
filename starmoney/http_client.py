@@ -15,6 +15,7 @@ from .exceptions import (
     ValidationError,
     PaymentNotFoundError,
     DuplicateResourceError,
+    InvalidIBANError,
     RateLimitError,
     ServerError,
     APIError,
@@ -116,6 +117,23 @@ class HTTPClient:
         except Exception:
             message = response.text or f"HTTP {response.status_code} error"
             error_data = {}
+
+        # `detail` may be a structured object: {"message": ..., "error_code": ...}
+        # (beneficiary IBAN/duplicate errors use this shape). Pull the code up
+        # and reduce `message` to the human string so exceptions read cleanly.
+        detail_code: Optional[str] = None
+        if isinstance(message, dict):
+            detail_code = message.get("error_code")
+            message = message.get("message") or message.get("detail") or str(message)
+
+        # A machine-readable error_code the server may return, either top-level
+        # or nested in `detail`. Used to raise a specific exception regardless
+        # of the (sometimes coarse) HTTP status.
+        error_code = None
+        if isinstance(error_data, dict):
+            error_code = error_data.get("error_code") or detail_code
+        if error_code == "INVALID_IBAN":
+            raise InvalidIBANError(message, error_data, response.status_code)
 
         # Check for UP3 error codes embedded in the detail string or error_code field.
         # The API returns UP3_* codes in either `detail` or an `error_code` field.
