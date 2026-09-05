@@ -135,6 +135,7 @@ class PaymentsResource:
         fees_minor: Optional[dict[str, int]] = None,
         intent_ttl_minutes: int = 15,
         cart_ttl_minutes: int = 2,
+        idempotency_seed: Optional[str] = None,
     ) -> dict[str, Any]:
         """
         Build Intent + Cart mandates, submit the payment, and verify the
@@ -175,6 +176,16 @@ class PaymentsResource:
                         Defaults to empty dict.
             intent_ttl_minutes: IntentMandate TTL (default 15, max 60).
             cart_ttl_minutes: CartMandate TTL (default 2).
+            idempotency_seed: Opaque, caller-stable seed (e.g. a consent_jti)
+                the cart.id is derived from — pass the SAME seed on a
+                transport-level retry (timeout, no response) of the SAME
+                authorization so it collapses onto the identical cart.id and
+                the bank rejects the retry as UP3_REPLAY instead of posting a
+                second payment. Use a NEW seed for every distinct
+                authorization and whenever the user re-confirms after a
+                FAILED/CANCELLED payment. See UP3Resource.build_cart for the
+                full contract. Omit for the legacy behavior (fresh random id
+                every call, no retry-safety).
 
         Returns:
             Full CreatePaymentAPIResponse dict. The payment_mandate key carries
@@ -216,7 +227,21 @@ class PaymentsResource:
             confirmed_at=confirmed_at,
             consent_evidence=consent_token,
             ttl_minutes=cart_ttl_minutes,
+            idempotency_seed=idempotency_seed,
         )
+
+        # Fail fast, locally: a caller-supplied client_transaction_id that
+        # disagrees with the (derived-or-random) cart.id is rejected by the
+        # server as UP3_SCHEMA_INVALID (cart.id is the sole idempotency
+        # anchor in v0.1). Catch it here instead of round-tripping.
+        if client_transaction_id is not None and client_transaction_id != cart["id"]:
+            raise ValueError(
+                f"client_transaction_id={client_transaction_id!r} does not match "
+                f"cart.id={cart['id']!r}; cart.id is the canonical idempotency "
+                f"anchor in v0.1 — omit client_transaction_id and let it default "
+                f"to cart.id, or pass idempotency_seed instead of a raw "
+                f"client_transaction_id."
+            )
 
         # Use cart.id as the idempotency key per UP3 spec recommendation.
         txn_id = client_transaction_id or cart["id"]

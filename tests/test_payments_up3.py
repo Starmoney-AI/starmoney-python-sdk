@@ -195,6 +195,137 @@ async def test_send_with_mandates_builds_and_submits_mandates():
 
 
 # ---------------------------------------------------------------------------
+# send_with_mandates — idempotency_seed (retry safety end-to-end)
+# ---------------------------------------------------------------------------
+
+
+def _mock_post_response(http, cart_id_holder):
+    """Wire http.post to capture the posted cart.id and return a minimal
+    success response (no payment_mandate — verify step is skipped)."""
+
+    async def _post(path, json, user_id=None):
+        cart_id_holder.append(json["cart_mandate"]["id"])
+        resp = MagicMock()
+        resp.json.return_value = {
+            "transaction_id": "txn-1",
+            "client_transaction_id": json["client_transaction_id"],
+            "status": "PENDING",
+        }
+        return resp
+
+    http.post = _post
+
+
+@pytest.mark.asyncio
+async def test_send_with_mandates_same_seed_retry_reuses_cart_id():
+    """The end-to-end retry-safety property: two send_with_mandates calls
+    with the same idempotency_seed POST the identical cart.id both times."""
+    resource, http = _make_payments_with_up3()
+    posted_cart_ids: list = []
+    _mock_post_response(http, posted_cart_ids)
+
+    kwargs = dict(
+        user_id="user-1",
+        amount_minor=5000,
+        currency="XOF",
+        beneficiary_iban="SN12K00100152000025690000754",
+        beneficiary_name="Fatou",
+        description="Test",
+        rail_name="BDK",
+        user_ref="whatsapp:+221770000000",
+        idempotency_seed="consent-jti-abc123",
+    )
+
+    await resource.send_with_mandates(**kwargs)
+    await resource.send_with_mandates(**kwargs)  # simulates a transport-level retry
+
+    assert len(posted_cart_ids) == 2
+    assert posted_cart_ids[0] == posted_cart_ids[1]
+
+
+@pytest.mark.asyncio
+async def test_send_with_mandates_different_seeds_get_different_cart_ids():
+    resource, http = _make_payments_with_up3()
+    posted_cart_ids: list = []
+    _mock_post_response(http, posted_cart_ids)
+
+    base_kwargs = dict(
+        user_id="user-1",
+        amount_minor=5000,
+        currency="XOF",
+        beneficiary_iban="SN12K00100152000025690000754",
+        beneficiary_name="Fatou",
+        description="Test",
+        rail_name="BDK",
+        user_ref="whatsapp:+221770000000",
+    )
+
+    await resource.send_with_mandates(**base_kwargs, idempotency_seed="consent-jti-abc123")
+    await resource.send_with_mandates(**base_kwargs, idempotency_seed="consent-jti-different")
+
+    assert posted_cart_ids[0] != posted_cart_ids[1]
+
+
+@pytest.mark.asyncio
+async def test_send_with_mandates_client_transaction_id_defaults_to_derived_cart_id():
+    resource, http = _make_payments_with_up3()
+    posted_cart_ids: list = []
+    posted_txn_ids: list = []
+
+    async def _post(path, json, user_id=None):
+        posted_cart_ids.append(json["cart_mandate"]["id"])
+        posted_txn_ids.append(json["client_transaction_id"])
+        resp = MagicMock()
+        resp.json.return_value = {
+            "transaction_id": "txn-1",
+            "client_transaction_id": json["client_transaction_id"],
+            "status": "PENDING",
+        }
+        return resp
+
+    http.post = _post
+
+    await resource.send_with_mandates(
+        user_id="user-1",
+        amount_minor=5000,
+        currency="XOF",
+        beneficiary_iban="SN12K00100152000025690000754",
+        beneficiary_name="Fatou",
+        description="Test",
+        rail_name="BDK",
+        user_ref="whatsapp:+221770000000",
+        idempotency_seed="consent-jti-abc123",
+    )
+
+    assert posted_txn_ids[0] == posted_cart_ids[0]
+
+
+@pytest.mark.asyncio
+async def test_send_with_mandates_rejects_mismatched_client_transaction_id_locally():
+    """A caller-supplied client_transaction_id that disagrees with the
+    (seed-derived) cart.id fails fast locally, without a round-trip — the
+    server would otherwise reject it as UP3_SCHEMA_INVALID."""
+    resource, http = _make_payments_with_up3()
+    http.post = AsyncMock()
+
+    with pytest.raises(ValueError, match="does not match"):
+        await resource.send_with_mandates(
+            user_id="user-1",
+            amount_minor=5000,
+            currency="XOF",
+            beneficiary_iban="SN12K00100152000025690000754",
+            beneficiary_name="Fatou",
+            description="Test",
+            rail_name="BDK",
+            user_ref="whatsapp:+221770000000",
+            idempotency_seed="consent-jti-abc123",
+            client_transaction_id="SM-some-other-id",
+        )
+
+    http.post.assert_not_called()
+
+
+# ---------------------------------------------------------------------------
 # UP3 exceptions — code map
 # ---------------------------------------------------------------------------
 

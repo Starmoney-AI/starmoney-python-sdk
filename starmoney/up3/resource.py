@@ -20,6 +20,8 @@ omitted, it defaults to `jwt_secret.encode()`.
 
 from __future__ import annotations
 
+import base64
+import hashlib
 import re
 import time
 from datetime import datetime, timedelta, timezone
@@ -63,6 +65,41 @@ def _generate_ulid() -> str:
 def _mandate_id() -> str:
     """Generate a mandate id matching ^mnd_[A-Z0-9]{26}$."""
     return f"mnd_{_generate_ulid()}"
+
+
+def _derive_cart_id(issuer: str, seed: str) -> str:
+    """Derive a caller-stable CartMandate id from an idempotency seed.
+
+    A retry (timeout, no response, connection reset) that calls build_cart
+    again with the SAME seed must regenerate the IDENTICAL cart.id, so the
+    bank's (issuer, cart.id) uniqueness rule recognizes it as a replay
+    instead of a new payment. This is a normative part of the v0.1 retry
+    contract, not an implementation detail — other UP3 SDKs (TS, Java, ...)
+    MUST reproduce this exact derivation byte-for-byte, or a retry through a
+    different SDK would mint a different anchor and defeat the guarantee.
+
+    Derivation (fixed, do not change without a protocol version bump):
+        cart.id = "mnd_" + base32(sha256(b"up3.cart.id.v1|" + issuer + "|" + seed))[:26]
+
+    RFC 4648 base32 (alphabet A-Z2-7, no padding) is a subset of
+    [A-Z0-9], so the result satisfies ^mnd_[A-Z0-9]{26}$ by construction.
+    `issuer` is included in the preimage for domain separation between
+    issuers using the same seed value.
+
+    Args:
+        issuer: The signing issuer (domain-separates the derivation).
+        seed: Caller-supplied idempotency seed (e.g. a consent_jti). Must be
+              a non-empty, non-whitespace string.
+
+    Raises:
+        ValueError: seed is empty or whitespace-only.
+    """
+    if not seed or not seed.strip():
+        raise ValueError("idempotency_seed must be a non-empty string")
+    preimage = f"up3.cart.id.v1|{issuer}|{seed}".encode("utf-8")
+    digest = hashlib.sha256(preimage).digest()
+    b32 = base64.b32encode(digest).decode("ascii").rstrip("=")
+    return f"mnd_{b32[:26].upper()}"
 
 
 def _now_z() -> str:
@@ -169,6 +206,7 @@ class UP3Resource:
         confirmed_at: Optional[str] = None,
         consent_evidence: Optional[dict[str, Any]] = None,
         ttl_minutes: int = 2,
+        idempotency_seed: Optional[str] = None,
     ) -> dict[str, Any]:
         """Build and sign a CartMandate envelope.
 
@@ -194,6 +232,27 @@ class UP3Resource:
             consent_evidence: user_consent_evidence dict. Defaults to
                               {"type": "service_attestation", "data": {}}.
             ttl_minutes: CartMandate lifetime in minutes (default 2).
+            idempotency_seed: Opaque, caller-stable input the cart.id is
+                derived from (e.g. a consent_jti) — NOT the id itself. Pass
+                the SAME seed on a transport-level retry (timeout, no
+                response, connection reset) of the SAME authorization, so the
+                retry regenerates the identical cart.id and the bank's
+                (issuer, cart.id) uniqueness rule rejects it as a replay
+                instead of posting a second payment.
+
+                Use a NEW seed for every distinct authorization, and whenever
+                the user re-confirms after a FAILED/CANCELLED payment — that
+                is a new payment, not a retry, and must get a fresh cart. A
+                fresh cart could otherwise be produced without touching this
+                parameter (the default: random id per call); the seed exists
+                only to make a genuine retry collapse onto the same anchor.
+                Reusing a seed across two different payments (different
+                amount/beneficiary/etc) is safe but will surface as
+                UP3_REPLAY on the second — that is the uniqueness rule
+                working as intended, not a bug.
+
+                Omit for the legacy behavior: a fresh random id every call
+                (no retry-safety).
 
         Returns:
             Signed CartMandate envelope dict ready to POST as cart_mandate.
@@ -208,7 +267,11 @@ class UP3Resource:
         intent_id = intent_mandate["id"]
         intent_payload = intent_mandate["payload"]
 
-        mandate_id = _mandate_id()
+        mandate_id = (
+            _derive_cart_id(self._issuer, idempotency_seed)
+            if idempotency_seed is not None
+            else _mandate_id()
+        )
         now = _now_z()
         expires = _future_z(ttl_minutes)
 

@@ -237,6 +237,100 @@ def test_build_cart_default_service_attestation():
 
 
 # ---------------------------------------------------------------------------
+# build_cart — idempotency_seed (caller-stable cart.id for retry safety)
+# ---------------------------------------------------------------------------
+
+
+def _build_cart_with_seed(resource: UP3Resource, seed) -> dict:
+    intent = resource.build_intent(
+        user_ref="whatsapp:+221770000001",
+        description="send 5000 XOF to Fatou",
+        max_amount_minor=5000,
+        currency="XOF",
+    )
+    return resource.build_cart(
+        intent,
+        amount_minor=5000,
+        beneficiary_iban="SN12K00100152000025690000754",
+        beneficiary_name="Fatou Ndiaye",
+        idempotency_seed=seed,
+    )
+
+
+def test_same_seed_produces_identical_cart_id():
+    """The core retry-safety property: same seed -> same cart.id, every call."""
+    resource = UP3Resource(secret=SECRET, issuer=ISSUER)
+    first = _build_cart_with_seed(resource, "consent-jti-abc123")
+    second = _build_cart_with_seed(resource, "consent-jti-abc123")
+    assert first["id"] == second["id"]
+
+
+def test_different_seeds_produce_different_cart_ids():
+    resource = UP3Resource(secret=SECRET, issuer=ISSUER)
+    a = _build_cart_with_seed(resource, "consent-jti-abc123")
+    b = _build_cart_with_seed(resource, "consent-jti-xyz789")
+    assert a["id"] != b["id"]
+
+
+def test_seed_derived_id_matches_mandate_id_shape():
+    resource = UP3Resource(secret=SECRET, issuer=ISSUER)
+    cart = _build_cart_with_seed(resource, "consent-jti-abc123")
+    assert re.match(r"^mnd_[A-Z0-9]{26}$", cart["id"])
+
+
+def test_different_issuer_same_seed_produces_different_cart_id():
+    """Domain separation: issuer is part of the preimage."""
+    seed = "consent-jti-abc123"
+    cart_a = _build_cart_with_seed(UP3Resource(secret=SECRET, issuer="issuer-a"), seed)
+    cart_b = _build_cart_with_seed(UP3Resource(secret=SECRET, issuer="issuer-b"), seed)
+    assert cart_a["id"] != cart_b["id"]
+
+
+def test_seed_derived_cart_signature_verifies():
+    resource = UP3Resource(secret=SECRET, issuer=ISSUER)
+    cart = _build_cart_with_seed(resource, "consent-jti-abc123")
+    assert verify(cart, secret=SECRET) is True
+
+
+def test_empty_seed_raises_value_error():
+    resource = UP3Resource(secret=SECRET, issuer=ISSUER)
+    with pytest.raises(ValueError, match="non-empty"):
+        _build_cart_with_seed(resource, "")
+
+
+def test_whitespace_only_seed_raises_value_error():
+    resource = UP3Resource(secret=SECRET, issuer=ISSUER)
+    with pytest.raises(ValueError, match="non-empty"):
+        _build_cart_with_seed(resource, "   ")
+
+
+def test_omitted_seed_keeps_legacy_random_id_behavior():
+    """No idempotency_seed -> unchanged legacy behavior: fresh random id."""
+    resource = UP3Resource(secret=SECRET, issuer=ISSUER)
+    a = _build_cart_with_seed(resource, None)
+    b = _build_cart_with_seed(resource, None)
+    assert a["id"] != b["id"]
+
+
+def test_derivation_reference_vector():
+    """Pin the derivation byte-for-byte so other UP3 SDKs (TS, Java, ...) can
+    reproduce it exactly: cart.id = mnd_ + base32(sha256(preimage))[:26]."""
+    import base64
+    import hashlib
+
+    from starmoney.up3.resource import _derive_cart_id
+
+    issuer = "reference-issuer"
+    seed = "reference-seed-v1"
+    preimage = f"up3.cart.id.v1|{issuer}|{seed}".encode("utf-8")
+    expected_b32 = base64.b32encode(hashlib.sha256(preimage).digest()).decode("ascii").rstrip("=")
+    expected = f"mnd_{expected_b32[:26].upper()}"
+
+    assert _derive_cart_id(issuer, seed) == expected
+    assert re.match(r"^mnd_[A-Z0-9]{26}$", expected)
+
+
+# ---------------------------------------------------------------------------
 # verify_payment_mandate
 # ---------------------------------------------------------------------------
 
