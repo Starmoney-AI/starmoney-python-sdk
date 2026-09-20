@@ -72,8 +72,8 @@ def _derive_cart_id(issuer: str, seed: str) -> str:
 
     A retry (timeout, no response, connection reset) that calls build_cart
     again with the SAME seed must regenerate the IDENTICAL cart.id, so the
-    bank's (issuer, cart.id) uniqueness rule recognizes it as a replay
-    instead of a new payment. This is a normative part of the v0.1 retry
+    bank recognizes it as the same payment and answers with the stored outcome
+    instead of executing a new one. This is a normative part of the v0.1 retry
     contract, not an implementation detail — other UP3 SDKs (TS, Java, ...)
     MUST reproduce this exact derivation byte-for-byte, or a retry through a
     different SDK would mint a different anchor and defeat the guarantee.
@@ -236,8 +236,8 @@ class UP3Resource:
                 derived from (e.g. a consent_jti) — NOT the id itself. Pass
                 the SAME seed on a transport-level retry (timeout, no
                 response, connection reset) of the SAME authorization, so the
-                retry regenerates the identical cart.id and the bank's
-                (issuer, cart.id) uniqueness rule rejects it as a replay
+                retry regenerates the identical cart.id and the bank answers
+                it with the stored outcome (HTTP 200, the original payment)
                 instead of posting a second payment.
 
                 Use a NEW seed for every distinct authorization, and whenever
@@ -247,9 +247,9 @@ class UP3Resource:
                 parameter (the default: random id per call); the seed exists
                 only to make a genuine retry collapse onto the same anchor.
                 Reusing a seed across two different payments (different
-                amount/beneficiary/etc) is safe but will surface as
-                UP3_REPLAY on the second — that is the uniqueness rule
-                working as intended, not a bug.
+                amount/beneficiary) is safe but the second is rejected as
+                UP3_REPLAY (409) — a key reused with new content is a
+                conflict, never resolved silently.
 
                 Omit for the legacy behavior: a fresh random id every call
                 (no retry-safety).

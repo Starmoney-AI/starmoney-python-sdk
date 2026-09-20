@@ -147,7 +147,13 @@ class UP3Expired(UP3Error):
 
 
 class UP3Replay(UP3Error):
-    """UP3_REPLAY — Mandate id already seen within replay window (HTTP 409)."""
+    """UP3_REPLAY — a cart id was reused with different content, or by a different
+    user/service (HTTP 409).
+
+    A same-seed retry with the same content is NOT an error: the API answers
+    HTTP 200 with the original payment and its stored PaymentMandate at the
+    latest revision (ADR-005).
+    """
 
     code = "UP3_REPLAY"
 

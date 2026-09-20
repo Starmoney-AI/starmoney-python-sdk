@@ -66,7 +66,10 @@ class PaymentsResource:
 
         Raises:
             ValidationError (400/401/410/422): UP3 chain or schema error.
-            DuplicateResourceError (409): UP3_REPLAY.
+            UP3Replay (409): a cart id reused with different content or by a
+                different owner. A same-cart.id retry with the same content is
+                not an error — it returns the stored outcome (HTTP 200).
+            DuplicateResourceError (409): non-mandated duplicate client_transaction_id.
         """
         # Convert amount to string for API
         if isinstance(amount, Decimal):
@@ -177,15 +180,18 @@ class PaymentsResource:
             intent_ttl_minutes: IntentMandate TTL (default 15, max 60).
             cart_ttl_minutes: CartMandate TTL (default 2).
             idempotency_seed: Opaque, caller-stable seed (e.g. a consent_jti)
-                the cart.id is derived from — pass the SAME seed on a
-                transport-level retry (timeout, no response) of the SAME
-                authorization so it collapses onto the identical cart.id and
-                the bank rejects the retry as UP3_REPLAY instead of posting a
-                second payment. Use a NEW seed for every distinct
-                authorization and whenever the user re-confirms after a
-                FAILED/CANCELLED payment. See UP3Resource.build_cart for the
-                full contract. Omit for the legacy behavior (fresh random id
-                every call, no retry-safety).
+                the cart.id is derived from. RETRY CONTRACT: pass the SAME seed
+                when retrying the SAME authorization after a timeout / network
+                failure — the bank answers with the STORED outcome (HTTP 200:
+                the original transaction_id and its PaymentMandate at the latest
+                revision; response `status` is already_in_progress,
+                already_completed or already_failed) instead of posting a second
+                debit. A NEW seed is required for every distinct authorization
+                and after any failed payment (the old seed keeps returning the
+                stored failure). Reusing a seed with a different amount or
+                beneficiary is rejected as UP3_REPLAY (409). See
+                UP3Resource.build_cart. Omit for the legacy behaviour (fresh
+                random id every call, no retry-safety).
 
         Returns:
             Full CreatePaymentAPIResponse dict. The payment_mandate key carries
