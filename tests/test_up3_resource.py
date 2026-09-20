@@ -175,7 +175,7 @@ def test_build_cart_structure_and_chain():
     cart = resource.build_cart(
         intent,
         amount_minor=5000,
-        beneficiary_iban="SN12K00100152000025690000754",
+        beneficiary_iban="SN12K00100152000025690007542",
         beneficiary_name="Fatou Ndiaye",
         rail="BDK",
         fees_minor={"orchestrator": 50},
@@ -189,7 +189,7 @@ def test_build_cart_structure_and_chain():
     assert payload["user_ref"] == "whatsapp:+221770000001"
     assert payload["amount_minor"] == 5000
     assert payload["currency"] == "XOF"
-    assert payload["beneficiary_iban"] == "SN12K00100152000025690000754"
+    assert payload["beneficiary_iban"] == "SN12K00100152000025690007542"
     assert payload["rail"] == "BDK"
     assert payload["fees_minor"] == {"orchestrator": 50}
     assert payload["confirmed_at"] == confirmed_at
@@ -209,7 +209,7 @@ def test_build_cart_signature_verifies():
     cart = resource.build_cart(
         intent,
         amount_minor=1000,
-        beneficiary_iban="SN12K00100152000025690000754",
+        beneficiary_iban="SN12K00100152000025690007542",
         beneficiary_name="Rec",
         rail="BDK",
     )
@@ -227,7 +227,7 @@ def test_build_cart_default_service_attestation():
     cart = resource.build_cart(
         intent,
         amount_minor=500,
-        beneficiary_iban="SN12K00100152000025690000754",
+        beneficiary_iban="SN12K00100152000025690007542",
         beneficiary_name="Rec",
         rail="BDK",
     )
@@ -251,7 +251,7 @@ def _build_cart_with_seed(resource: UP3Resource, seed) -> dict:
     return resource.build_cart(
         intent,
         amount_minor=5000,
-        beneficiary_iban="SN12K00100152000025690000754",
+        beneficiary_iban="SN12K00100152000025690007542",
         beneficiary_name="Fatou Ndiaye",
         idempotency_seed=seed,
     )
@@ -354,7 +354,7 @@ def _build_fake_payment_mandate(resource: UP3Resource, cart_id: str) -> dict:
             "rail": "BDK",
             "amount_minor": 5000,
             "currency": "XOF",
-            "beneficiary_iban": "SN12K00100152000025690000754",
+            "beneficiary_iban": "SN12K00100152000025690007542",
             "submitted_at": _now_z(),
             "status": "submitted",
             "rail_transaction_id": None,

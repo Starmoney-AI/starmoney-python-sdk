@@ -59,7 +59,7 @@ class StarmoneyClient:
                     user_id=user_id,
                     amount_minor=5000,
                     currency="XOF",
-                    beneficiary_iban="SN12K00100152000025690000754",
+                    beneficiary_iban="SN12K00100152000025690007542",
                     beneficiary_name="Fatou Ndiaye",
                     description="send 5000 XOF to Fatou",
                     user_ref="whatsapp:+221771234567",

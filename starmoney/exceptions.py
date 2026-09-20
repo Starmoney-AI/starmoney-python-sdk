@@ -76,6 +76,39 @@ class InvalidIBANError(APIError):
         super().__init__(status_code, message, response_data)
 
 
+class PreKycCeilingExceededError(APIError):
+    """403 - the send exceeds the PER-SEND ceiling of a holder the bank has not
+    verified yet (``error_code == "PRE_KYC_CEILING_EXCEEDED"``)."""
+
+    pass
+
+
+class PreKycTotalCeilingExceededError(APIError):
+    """403 - the send would take the holder's CUMULATIVE sends past the pre-KYC
+    total ceiling (``error_code == "PRE_KYC_TOTAL_CEILING_EXCEEDED"``).
+
+    Lifetime until the bank verifies the holder — there is no reset date.
+    ``remaining_minor`` is what may still be sent (« envois possibles »): a
+    count of the holder's own sends, NOT the money in their account.
+    """
+
+    @property
+    def ceiling_minor(self) -> Optional[int]:
+        return self.response_data.get("ceiling_minor")
+
+    @property
+    def consumed_minor(self) -> Optional[int]:
+        return self.response_data.get("consumed_minor")
+
+    @property
+    def pending_minor(self) -> Optional[int]:
+        return self.response_data.get("pending_minor")
+
+    @property
+    def remaining_minor(self) -> Optional[int]:
+        return self.response_data.get("remaining_minor")
+
+
 class RateLimitError(APIError):
     """429 - Too many requests."""
 

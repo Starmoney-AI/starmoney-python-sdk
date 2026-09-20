@@ -16,6 +16,8 @@ from .exceptions import (
     PaymentNotFoundError,
     DuplicateResourceError,
     InvalidIBANError,
+    PreKycCeilingExceededError,
+    PreKycTotalCeilingExceededError,
     RateLimitError,
     ServerError,
     APIError,
@@ -134,6 +136,10 @@ class HTTPClient:
             error_code = error_data.get("error_code") or detail_code
         if error_code == "INVALID_IBAN":
             raise InvalidIBANError(message, error_data, response.status_code)
+        if error_code == "PRE_KYC_TOTAL_CEILING_EXCEEDED":
+            raise PreKycTotalCeilingExceededError(response.status_code, message, error_data)
+        if error_code == "PRE_KYC_CEILING_EXCEEDED":
+            raise PreKycCeilingExceededError(response.status_code, message, error_data)
 
         # Check for UP3 error codes embedded in the detail string or error_code field.
         # The API returns UP3_* codes in either `detail` or an `error_code` field.

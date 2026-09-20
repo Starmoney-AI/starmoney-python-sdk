@@ -3,6 +3,8 @@
 from decimal import Decimal
 from typing import TYPE_CHECKING, Any, Optional
 
+from .._iban import is_valid_iban
+from ..exceptions import InvalidIBANError
 from ..http_client import HTTPClient
 
 if TYPE_CHECKING:
@@ -65,12 +67,20 @@ class PaymentsResource:
             payment_mandate (revision-1 PaymentMandate signed by StarMoney).
 
         Raises:
+            InvalidIBANError (422): beneficiary_iban failed format or mod-97 —
+                raised client-side before the request, and by the server.
+            PreKycCeilingExceededError (403): over the per-send pre-KYC ceiling.
+            PreKycTotalCeilingExceededError (403): over the cumulative pre-KYC
+                send ceiling; carries ceiling / consumed / pending / remaining.
             ValidationError (400/401/410/422): UP3 chain or schema error.
             UP3Replay (409): a cart id reused with different content or by a
                 different owner. A same-cart.id retry with the same content is
                 not an error — it returns the stored outcome (HTTP 200).
             DuplicateResourceError (409): non-mandated duplicate client_transaction_id.
         """
+        if not is_valid_iban(beneficiary_iban):
+            raise InvalidIBANError(f"Invalid IBAN: {beneficiary_iban!r} failed mod-97 validation")
+
         # Convert amount to string for API
         if isinstance(amount, Decimal):
             amount_str = str(amount)

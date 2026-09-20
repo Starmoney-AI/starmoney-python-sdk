@@ -207,6 +207,8 @@ class AccountsResource:
               - kyc_required: bool — the holder must KYC to lift the ceiling
               - last_event: str | None
               - updated_at: ISO datetime | None
+              - limits: list — the send limits binding the holder while the
+                bank has not verified them; [] once verified. See get_limits().
 
         Raises:
             NotFoundError (404): no account state for this user.
@@ -214,6 +216,30 @@ class AccountsResource:
         """
         response = await self.http.get("/accounts/status", user_id=user_id)
         return response.json()
+
+    async def get_limits(self, user_id: str) -> list[dict[str, Any]]:
+        """
+        The send limits currently binding the holder — ``[]`` once verified.
+
+        While the bank has not verified the holder (``active_pre_kyc`` or
+        ``kyc_pending``) two limits apply, both lifted on ``kyc_verified`` and
+        with NO reset date (lifetime until verification):
+
+          - ``pre_kyc_per_send``    — ceiling per send; ``consumed_minor`` /
+            ``pending_minor`` / ``remaining_minor`` are None.
+          - ``pre_kyc_total_sends`` — ceiling on all sends together.
+            ``consumed_minor`` = executed, ``pending_minor`` = in flight (counts
+            against the ceiling), ``remaining_minor`` = what may still be sent.
+
+        ``remaining_minor`` counts the holder's own sends (« envois possibles »).
+        It is NOT the money in the account — never present it as a balance.
+        Money received is not limited and not counted. Indicative: the server's
+        send guard is the authority (a concurrent send can change the figures).
+
+        Convenience over get_status(): returns its ``limits`` list.
+        """
+        status = await self.get_status(user_id)
+        return list(status.get("limits") or [])
 
     async def submit_kyc(
         self,
