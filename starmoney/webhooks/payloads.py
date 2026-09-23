@@ -23,7 +23,7 @@ shapes.
 
 from __future__ import annotations
 
-from typing import TypedDict
+from typing import Optional, TypedDict
 
 
 class WebhookMetadata(TypedDict):
@@ -87,6 +87,10 @@ class PaymentReceivedPayload(_PaymentReceivedPayloadRequired, total=False):
     """
 
     client_reference: str  # ADR-004: only present when the caller supplied one
+    # Who paid: the deferred-transfer sender's first name on a claim credit;
+    # None when unknown (Eucalyptus virements carry no payer). Absent on
+    # events emitted before 0.1.17.
+    sender_name: Optional[str]
 
 
 __all__ = [

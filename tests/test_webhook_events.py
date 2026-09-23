@@ -153,6 +153,7 @@ def test_payment_received_payload_accepts_realistic_body():
         "source": "eucalyptus",
         "source_bank_code": "BDK",
         "value_date": "2026-08-27",
+        "sender_name": None,
         "client_reference": "bot_557712",
         "metadata": {
             "service": "starmoney-bank-service",

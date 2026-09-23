@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.1.17] — 2026-09-23
+
+### `payment.received` names the payer
+
+- `PaymentReceivedPayload.sender_name: Optional[str]` (optional key) — the
+  deferred-transfer sender's first name when the credit is a claim; `None`
+  when the payer is unknown (Eucalyptus virements carry no payer). Typing only,
+  no runtime change.
+
 ## [0.1.12] — 2026-08-28
 
 ### Webhook event catalog + typed payloads (transfer notifications, PR #101)
