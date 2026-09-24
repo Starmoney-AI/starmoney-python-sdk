@@ -154,6 +154,7 @@ def test_payment_received_payload_accepts_realistic_body():
         "source_bank_code": "BDK",
         "value_date": "2026-08-27",
         "sender_name": None,
+        "source_bank_name": "SOCIETE GENERALE SENEGAL",
         "client_reference": "bot_557712",
         "metadata": {
             "service": "starmoney-bank-service",

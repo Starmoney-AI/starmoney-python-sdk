@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.1.18] — 2026-09-24
+
+### `payment.received` names the sending bank
+
+- `PaymentReceivedPayload.source_bank_name: Optional[str]` (optional key) — the
+  sending bank's name from the Eucalyptus notification (e.g. "SOCIETE GENERALE
+  SENEGAL"); `None` on an internal deferred-transfer claim credit. Use it when
+  `sender_name` is `None`. Typing only, no runtime change.
+
 ## [0.1.17] — 2026-09-23
 
 ### `payment.received` names the payer

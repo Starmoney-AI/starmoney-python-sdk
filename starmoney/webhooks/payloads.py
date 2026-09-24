@@ -91,6 +91,9 @@ class PaymentReceivedPayload(_PaymentReceivedPayloadRequired, total=False):
     # None when unknown (Eucalyptus virements carry no payer). Absent on
     # events emitted before 0.1.17.
     sender_name: Optional[str]
+    # The sending bank's name (e.g. "SOCIETE GENERALE SENEGAL"); None on an
+    # internal deferred-transfer claim credit. Absent before 0.1.18.
+    source_bank_name: Optional[str]
 
 
 __all__ = [
