@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.1.20] — 2026-09-27
+
+- `accounts.get_balance()` now also returns `account_reference`: the vIBAN
+  (IBAN) the balance belongs to. Additive.
+
 ## [0.1.19] — 2026-09-27
 
 ### vIBAN balance read + richer account status

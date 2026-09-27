@@ -261,6 +261,7 @@ class AccountsResource:
 
         Returns:
             dict with keys:
+              - account_reference: str — the vIBAN (IBAN) the balance belongs to
               - available_minor: int — what the holder can use now
               - reserved_minor: int — held for in-flight transfers
               - balance_minor: int — available_minor + reserved_minor

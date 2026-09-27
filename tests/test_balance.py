@@ -28,6 +28,7 @@ async def test_get_balance_calls_the_user_scoped_path_and_returns_whole_francs()
     http = MagicMock()
     resp = MagicMock()
     resp.json.return_value = {
+        "account_reference": "SN54K0010015200025285283931",
         "available_minor": 3_000,
         "reserved_minor": 2_000,
         "balance_minor": 5_000,
