@@ -209,6 +209,10 @@ class AccountsResource:
               - updated_at: ISO datetime | None
               - limits: list — the send limits binding the holder while the
                 bank has not verified them; [] once verified. See get_limits().
+              - limits_lifted: bool — True once verified (« sans limite »).
+
+            ``account_state`` is a closed set; parse it with
+            ``starmoney.AccountState``.
 
         Raises:
             NotFoundError (404): no account state for this user.
@@ -225,6 +229,10 @@ class AccountsResource:
         ``kyc_pending``) two limits apply, both lifted on ``kyc_verified`` and
         with NO reset date (lifetime until verification):
 
+        Each item also carries ``direction`` (``"outbound"``; ``"inbound"``
+        once inbound limits exist) and ``period`` (``"per_transaction"`` or
+        ``"lifetime_until_verified"``).
+
           - ``pre_kyc_per_send``    — ceiling per send; ``consumed_minor`` /
             ``pending_minor`` / ``remaining_minor`` are None.
           - ``pre_kyc_total_sends`` — ceiling on all sends together.
@@ -240,6 +248,32 @@ class AccountsResource:
         """
         status = await self.get_status(user_id)
         return list(status.get("limits") or [])
+
+    async def get_balance(self, user_id: str) -> dict[str, Any]:
+        """
+        The holder's vIBAN balance, read live from the vIBAN ledger.
+
+        Read-through: nothing is stored server-side; BDK remains the
+        account-of-record. Pre-KYC holders get it too (show it next to their
+        limits). XOF has no minor unit — the ``*_minor`` values are whole francs.
+
+        Auth: user-scoped JWT (``user_id`` mints the sub claim).
+
+        Returns:
+            dict with keys:
+              - available_minor: int — what the holder can use now
+              - reserved_minor: int — held for in-flight transfers
+              - balance_minor: int — available_minor + reserved_minor
+              - currency: str
+              - as_of: ISO datetime — when the ledger computed the figures
+
+        Raises:
+            NoVibanAccountError (404): the holder has no vIBAN (yet).
+            AccountNotPayableError (409): the vIBAN account is closed.
+            LedgerUnavailableError (503): the ledger could not be read; retry.
+        """
+        response = await self.http.get("/accounts/balance", user_id=user_id)
+        return response.json()
 
     async def submit_kyc(
         self,

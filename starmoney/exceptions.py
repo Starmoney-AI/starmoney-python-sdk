@@ -121,6 +121,26 @@ class ServerError(APIError):
     pass
 
 
+class NoVibanAccountError(APIError):
+    """404 - the holder has no vIBAN (yet), so there is no balance to read
+    (``error_code == "NO_VIBAN_ACCOUNT"``)."""
+
+    pass
+
+
+class AccountNotPayableError(APIError):
+    """409 - the holder's vIBAN account is closed (``error_code == "ACCOUNT_NOT_PAYABLE"``)."""
+
+    pass
+
+
+class LedgerUnavailableError(ServerError):
+    """503 - the vIBAN ledger could not be read (``error_code == "LEDGER_UNAVAILABLE"``).
+    Transient: retry later."""
+
+    pass
+
+
 class InvalidSignatureError(StarmoneyError):
     """Webhook signature validation failed."""
 

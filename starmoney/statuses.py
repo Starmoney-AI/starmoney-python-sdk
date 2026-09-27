@@ -1,4 +1,7 @@
-"""Typed values for the `status` field of a POST /v1/payments response.
+"""Typed values for response fields: POST /v1/payments `status`, and
+GET /v1/accounts/status `account_state`.
+
+(Original note, payments:) Typed values for the `status` field of a POST /v1/payments response.
 
 Members are plain strings (``str, Enum``) so they compare equal to the raw JSON
 value: ``resp["status"] == PaymentResponseStatus.ALREADY_FAILED`` works, as does
@@ -26,3 +29,25 @@ class PaymentResponseStatus(str, Enum):
     @property
     def is_stored_outcome(self) -> bool:
         return self is not PaymentResponseStatus.VALIDATED
+
+
+class AccountState(str, Enum):
+    """The closed set of ``account_state`` values on GET /v1/accounts/status.
+
+    captured → active_pre_kyc → kyc_pending → verified; closed is terminal.
+    There is no "refused" state.
+    """
+
+    CAPTURED = "captured"  # holder record only; no vIBAN yet
+    ACTIVE_PRE_KYC = "active_pre_kyc"  # vIBAN live; pre-KYC limits apply
+    KYC_PENDING = "kyc_pending"  # documents submitted; awaiting the bank
+    VERIFIED = "verified"  # bank-adjudicated; limits lifted (« sans limite »)
+    CLOSED = "closed"  # terminal
+
+    @property
+    def has_viban(self) -> bool:
+        return self in (
+            AccountState.ACTIVE_PRE_KYC,
+            AccountState.KYC_PENDING,
+            AccountState.VERIFIED,
+        )

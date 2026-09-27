@@ -21,6 +21,9 @@ from .exceptions import (
     RateLimitError,
     ServerError,
     APIError,
+    NoVibanAccountError,
+    AccountNotPayableError,
+    LedgerUnavailableError,
     UP3_ERROR_CODE_MAP,
 )
 
@@ -140,6 +143,12 @@ class HTTPClient:
             raise PreKycTotalCeilingExceededError(response.status_code, message, error_data)
         if error_code == "PRE_KYC_CEILING_EXCEEDED":
             raise PreKycCeilingExceededError(response.status_code, message, error_data)
+        if error_code == "NO_VIBAN_ACCOUNT":
+            raise NoVibanAccountError(response.status_code, message, error_data)
+        if error_code == "ACCOUNT_NOT_PAYABLE":
+            raise AccountNotPayableError(response.status_code, message, error_data)
+        if error_code == "LEDGER_UNAVAILABLE":
+            raise LedgerUnavailableError(response.status_code, message, error_data)
 
         # Check for UP3 error codes embedded in the detail string or error_code field.
         # The API returns UP3_* codes in either `detail` or an `error_code` field.

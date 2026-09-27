@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.1.19] — 2026-09-27
+
+### vIBAN balance read + richer account status
+
+- `accounts.get_balance(user_id)` → `GET /v1/accounts/balance`: `available_minor`,
+  `reserved_minor`, `balance_minor`, `currency`, `as_of` (whole XOF francs, read
+  live from the vIBAN ledger). Typed errors: `NoVibanAccountError` (404),
+  `AccountNotPayableError` (409), `LedgerUnavailableError` (503, a `ServerError`).
+- `starmoney.AccountState` — the closed set of `account_state` values
+  (`captured`, `active_pre_kyc`, `kyc_pending`, `verified`, `closed`).
+- `get_status()` now carries `limits_lifted` (True once verified), and each
+  `limits` item carries `direction` and `period`. Additive — existing keys unchanged.
+
 ## [0.1.18] — 2026-09-24
 
 ### `payment.received` names the sending bank
