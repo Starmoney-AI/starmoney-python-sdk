@@ -58,6 +58,7 @@ class WebhookEvent(str, Enum):
     number) — not masked, since delivery is already owner-gated."""
 
     DEFERRED_TRANSFER_SETTLED = "deferred_transfer.settled"
+    DEFERRED_TRANSFER_FAILED = "deferred_transfer.failed"
 
     # -----------------------------------------------------------------
     # Account lifecycle — sensitivity: USER_PRIVATE (ADR-002)

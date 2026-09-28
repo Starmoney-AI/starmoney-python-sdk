@@ -107,7 +107,7 @@ class DeferredTransfersResource:
             status: Optional comma-separated status filter (e.g. "reserved,armed").
                     When omitted, the API defaults to the cancellable set
                     (reserved, armed). Valid values: reserved, armed, claimed,
-                    claimed_pending_kyc, settled, expired, released, cancelled.
+                    claimed_pending_kyc, settling, settled, expired, released, cancelled.
             limit: Max transfers to return (default 20, capped at 100 server-side).
             offset: Number of transfers to skip (pagination).
 

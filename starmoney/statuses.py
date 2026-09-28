@@ -51,3 +51,22 @@ class AccountState(str, Enum):
             AccountState.KYC_PENDING,
             AccountState.VERIFIED,
         )
+
+
+class DeferredTransferStatus(str, Enum):
+    """``status`` of a deferred transfer (send / claim / list / status reads).
+
+    reserved → claimed → settling → settled; claimed_pending_kyc waits for KYC.
+    SETTLED means SENT (BDK accepted, sender debited) — the recipient's credit
+    comes as their own payment.received. settling is NOT cancellable.
+    """
+
+    RESERVED = "reserved"
+    ARMED = "armed"
+    CLAIMED = "claimed"
+    CLAIMED_PENDING_KYC = "claimed_pending_kyc"
+    SETTLING = "settling"  # the BDK virement is in flight
+    SETTLED = "settled"
+    EXPIRED = "expired"
+    RELEASED = "released"  # the hold was released; the sender has the money back
+    CANCELLED = "cancelled"

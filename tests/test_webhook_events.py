@@ -62,6 +62,7 @@ _EXPECTED_BROADCASTABLE_EVENTS = {
     # Deferred transfer
     "deferred_transfer.sent",
     "deferred_transfer.settled",
+    "deferred_transfer.failed",
     # Account lifecycle (ADR-002)
     "account.opened",
     "account.kyc.verified",
@@ -74,7 +75,7 @@ _EXPECTED_BROADCASTABLE_EVENTS = {
 def test_webhook_event_catalog_matches_server_broadcastable_set():
     actual = {member.value for member in WebhookEvent}
     assert actual == _EXPECTED_BROADCASTABLE_EVENTS
-    assert len(_EXPECTED_BROADCASTABLE_EVENTS) == 16
+    assert len(_EXPECTED_BROADCASTABLE_EVENTS) == 17
 
 
 # ---------------------------------------------------------------------------

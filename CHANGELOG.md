@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.1.22] — 2026-09-28
+
+### Deferred transfers settle through BDK — contract change
+
+- New status `settling` (the BDK virement is in flight). Send / claim responses
+  return `settling` where they returned `settled`. `starmoney.DeferredTransferStatus`
+  lists the closed set.
+- `deferred_transfer.settled` now means SENT: BDK accepted the virement and the
+  sender was debited. The recipient's credit arrives separately as their own
+  `payment.received` (sender_name filled). Keys unchanged.
+- New event `deferred_transfer.failed` (`WebhookEvent.DEFERRED_TRANSFER_FAILED`,
+  `DeferredTransferFailedPayload`) to the sending service when the settle cannot
+  go through BDK; the hold is released. `reason_code` ∈ {`bank_rejected`,
+  `hold_expired`} + a human `reason`.
+
 ## [0.1.21] — 2026-09-28
 
 ### Typed payloads for `deferred_transfer.settled` and the `account.*` events

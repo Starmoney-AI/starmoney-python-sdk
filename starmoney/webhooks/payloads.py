@@ -118,8 +118,39 @@ class DeferredTransferSettledPayload(_DeferredTransferSettledPayloadRequired, to
     """Delivered body for :attr:`WebhookEvent.DEFERRED_TRANSFER_SETTLED`.
 
     Delivered only to the SENDING service (``created_by_service``-gated,
-    SERVICE_PRIVATE): the money reached the recipient's account — whether they
-    claimed it, opened their account (auto-claim), or completed KYC.
+    SERVICE_PRIVATE). As of 0.1.22 it means SENT: BDK accepted the virement and
+    the sender was debited. The recipient's credit arrives separately, when BDK
+    reports it, as the recipient's own ``payment.received`` — StarMoney never
+    settles internally.
+    """
+
+    client_reference: str  # ADR-004: only present when the caller supplied one
+
+
+class _DeferredTransferFailedPayloadRequired(TypedDict):
+    event_type: str  # always "deferred_transfer.failed"
+    timestamp: str
+    correlation_id: str
+    transaction_id: str  # the deferred_transfer_id
+    client_transaction_id: str
+    user_id: str  # the SENDER's user id
+    created_by_service: str
+    amount_minor: int
+    currency: str
+    reason_code: str  # closed set: "bank_rejected" | "hold_expired"
+    reason: str  # human-readable
+    recipient_handle: str
+    recipient_display_name: Optional[str]
+    recipient_user_id: Optional[str]
+    metadata: WebhookMetadata
+
+
+class DeferredTransferFailedPayload(_DeferredTransferFailedPayloadRequired, total=False):
+    """Delivered body for :attr:`WebhookEvent.DEFERRED_TRANSFER_FAILED`.
+
+    Delivered only to the SENDING service: the transfer could not be settled
+    through BDK (definitively rejected, or its reservation expired before it
+    could go out). The hold was released — the sender has their money back.
     """
 
     client_reference: str  # ADR-004: only present when the caller supplied one
@@ -157,6 +188,7 @@ __all__ = [
     "WebhookMetadata",
     "DeferredTransferSentPayload",
     "DeferredTransferSettledPayload",
+    "DeferredTransferFailedPayload",
     "PaymentReceivedPayload",
     "AccountLifecyclePayload",
     "AccountOpenedPayload",
