@@ -1,8 +1,7 @@
 """StarMoney SDK - Typed Webhook Payloads
 
-TypedDicts for the delivered webhook body of the two newest broadcastable
-events (``deferred_transfer.sent`` / ``payment.received``, PR #101). These
-describe the **flat** delivery envelope built by
+TypedDicts for delivered webhook bodies (deferred transfers, payment.*,
+payment.received, account.*). These describe the **flat** delivery envelope built by
 ``WebhookDeliveryService._create_webhook_payload`` on the server — there is
 no nested ``data`` key; event-specific fields sit alongside ``event_type``,
 ``timestamp``, and ``correlation_id`` at the top level:
@@ -127,8 +126,8 @@ class DeferredTransferSettledPayload(_DeferredTransferSettledPayloadRequired, to
     client_reference: str  # ADR-004: only present when the caller supplied one
 
 
-class _DeferredTransferFailedPayloadRequired(TypedDict):
-    event_type: str  # always "deferred_transfer.failed"
+class _DeferredTransferClosedPayloadRequired(TypedDict):
+    event_type: str  # "deferred_transfer.expired" | "deferred_transfer.cancelled"
     timestamp: str
     correlation_id: str
     transaction_id: str  # the deferred_transfer_id
@@ -137,23 +136,122 @@ class _DeferredTransferFailedPayloadRequired(TypedDict):
     created_by_service: str
     amount_minor: int
     currency: str
-    reason_code: str  # closed set: "bank_rejected" | "hold_expired"
-    reason: str  # human-readable
+    # expired: "not_claimed" | "recipient_kyc_incomplete"; cancelled: "cancelled_by_sender"
+    reason_code: str
     recipient_handle: str
-    recipient_display_name: Optional[str]
-    recipient_user_id: Optional[str]
+    recipient_user_id: Optional[str]  # set once the recipient claimed
     metadata: WebhookMetadata
 
 
-class DeferredTransferFailedPayload(_DeferredTransferFailedPayloadRequired, total=False):
-    """Delivered body for :attr:`WebhookEvent.DEFERRED_TRANSFER_FAILED`.
+class DeferredTransferClosedPayload(_DeferredTransferClosedPayloadRequired, total=False):
+    """Delivered body for :attr:`WebhookEvent.DEFERRED_TRANSFER_EXPIRED` and
+    :attr:`WebhookEvent.DEFERRED_TRANSFER_CANCELLED`.
 
-    Delivered only to the SENDING service: the transfer could not be settled
-    through BDK (definitively rejected, or its reservation expired before it
-    could go out). The hold was released — the sender has their money back.
+    The transfer closed unpaid and its hold was released: the money is back
+    with the sender. Delivered to the sending service (``user_id`` = sender).
+    A settle that fails AFTER the claim is not reported here — it is an
+    ordinary payment and ends as ``payment.failed`` with ``deferred_transfer_id``.
     """
 
     client_reference: str  # ADR-004: only present when the caller supplied one
+
+
+DeferredTransferExpiredPayload = DeferredTransferClosedPayload
+DeferredTransferCancelledPayload = DeferredTransferClosedPayload
+
+
+class _PaymentInitiatedPayloadRequired(TypedDict):
+    event_type: str  # always "payment.initiated"
+    timestamp: str
+    correlation_id: str
+    transaction_id: str
+    client_transaction_id: str
+    user_id: str  # the paying user
+    created_by_service: str
+    rail_transaction_id: str  # our BDK reference ("SM-…")
+    idempotency_key: str
+    amount: str  # whole XOF as a string
+    currency: str
+    beneficiary_iban: str
+    beneficiary_name: str
+    rail_name: str
+    initiated_at: str
+    metadata: WebhookMetadata
+
+
+class PaymentInitiatedPayload(_PaymentInitiatedPayloadRequired, total=False):
+    """Delivered body for :attr:`WebhookEvent.PAYMENT_INITIATED`: BDK accepted
+    the instruction (money is moving; the terminal outcome comes later)."""
+
+    client_reference: str  # ADR-004: only present when the caller supplied one
+    # Only on a deferred transfer's settle payment (0.1.22): the claimed
+    # transfer this payment pays out. user_id / client_reference are the
+    # original sender's.
+    deferred_transfer_id: str
+
+
+class _PaymentRailFailedPayloadRequired(TypedDict):
+    event_type: str  # always "payment.failed"
+    timestamp: str
+    correlation_id: str
+    transaction_id: str
+    client_transaction_id: str
+    user_id: str
+    created_by_service: str
+    status: str  # always "FAILED"
+    error: str
+    failure_stage: str
+    rail_name: str
+    permanent_failure: bool
+    failed_at: str
+    amount: str
+    currency: str
+    beneficiary_iban: str
+    beneficiary_name: str
+    description: str
+    external_reference: Optional[str]
+    metadata: WebhookMetadata
+
+
+class PaymentRailFailedPayload(_PaymentRailFailedPayloadRequired, total=False):
+    """Delivered body for :attr:`WebhookEvent.PAYMENT_FAILED` when StarMoney
+    stopped the payment itself — at or before the rail call (bank refusal,
+    insufficient funds, hold about to lapse). Nothing was executed.
+
+    Compare :class:`PaymentBankStatusPayload`: a ``payment.failed`` reported
+    later by BDK's status callback has that shape instead (tell them apart by
+    ``"error" in body``).
+    """
+
+    client_reference: str  # ADR-004: only present when the caller supplied one
+    deferred_transfer_id: str  # only on a deferred transfer's settle payment
+
+
+class _PaymentBankStatusPayloadRequired(TypedDict):
+    event_type: str  # "payment.accepted" | "payment.completed" | "payment.failed"
+    timestamp: str
+    correlation_id: str
+    transaction_id: str
+    client_transaction_id: str
+    user_id: str
+    created_by_service: str
+    rail_transaction_id: str
+    idempotency_key: str
+    amount: str
+    currency: str
+    provider: str  # "bdk"
+    webhook_raw_data: dict  # BDK's callback, as received
+    processed_webhook_data: dict  # {external_reference, new_status, accounting_date, message, ...}
+    metadata: WebhookMetadata
+
+
+class PaymentBankStatusPayload(_PaymentBankStatusPayloadRequired, total=False):
+    """Delivered body for :attr:`WebhookEvent.PAYMENT_ACCEPTED` /
+    :attr:`WebhookEvent.PAYMENT_COMPLETED` / :attr:`WebhookEvent.PAYMENT_FAILED`
+    when BDK's asynchronous status callback reports the outcome."""
+
+    client_reference: str  # ADR-004: only present when the caller supplied one
+    deferred_transfer_id: str  # only on a deferred transfer's settle payment
 
 
 class _AccountLifecyclePayloadRequired(TypedDict):

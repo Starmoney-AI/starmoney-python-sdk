@@ -58,7 +58,17 @@ class WebhookEvent(str, Enum):
     number) — not masked, since delivery is already owner-gated."""
 
     DEFERRED_TRANSFER_SETTLED = "deferred_transfer.settled"
-    DEFERRED_TRANSFER_FAILED = "deferred_transfer.failed"
+    """DEPRECATED since 0.1.22 — no longer emitted. A claimed transfer settles as
+    an ordinary payment: follow ``payment.initiated`` / ``payment.completed`` /
+    ``payment.failed``, which carry ``deferred_transfer_id``."""
+
+    DEFERRED_TRANSFER_EXPIRED = "deferred_transfer.expired"
+    """The transfer expired unpaid and the hold was released: the money is back
+    with the sender. ``reason_code``: ``not_claimed`` | ``recipient_kyc_incomplete``."""
+
+    DEFERRED_TRANSFER_CANCELLED = "deferred_transfer.cancelled"
+    """The sender cancelled before the claim; the hold was released (money back).
+    ``reason_code``: ``cancelled_by_sender``."""
 
     # -----------------------------------------------------------------
     # Account lifecycle — sensitivity: USER_PRIVATE (ADR-002)

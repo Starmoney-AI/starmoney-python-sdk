@@ -42,7 +42,7 @@ def test_webhook_event_members_are_plain_strings():
 
 
 # ---------------------------------------------------------------------------
-# Full broadcastable catalog drift check (16 events, 5 domains — see
+# Full broadcastable catalog drift check (18 events, 5 domains — see
 # docs/WEBHOOK_EVENTS.md §5 in the monorepo).
 # ---------------------------------------------------------------------------
 
@@ -61,8 +61,9 @@ _EXPECTED_BROADCASTABLE_EVENTS = {
     "payment.mandate.failed",
     # Deferred transfer
     "deferred_transfer.sent",
-    "deferred_transfer.settled",
-    "deferred_transfer.failed",
+    "deferred_transfer.settled",  # deprecated in 0.1.22, still subscribable
+    "deferred_transfer.expired",
+    "deferred_transfer.cancelled",
     # Account lifecycle (ADR-002)
     "account.opened",
     "account.kyc.verified",
@@ -75,7 +76,7 @@ _EXPECTED_BROADCASTABLE_EVENTS = {
 def test_webhook_event_catalog_matches_server_broadcastable_set():
     actual = {member.value for member in WebhookEvent}
     assert actual == _EXPECTED_BROADCASTABLE_EVENTS
-    assert len(_EXPECTED_BROADCASTABLE_EVENTS) == 17
+    assert len(_EXPECTED_BROADCASTABLE_EVENTS) == 18
 
 
 # ---------------------------------------------------------------------------

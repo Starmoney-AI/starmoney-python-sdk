@@ -2,18 +2,29 @@
 
 ## [0.1.22] — 2026-09-28
 
-### Deferred transfers settle through BDK — contract change
+### Deferred transfers settle as ordinary payments through BDK — contract change
 
-- New status `settling` (the BDK virement is in flight). Send / claim responses
-  return `settling` where they returned `settled`. `starmoney.DeferredTransferStatus`
+- Once claimed, a deferred transfer's money moves as an **ordinary payment**
+  through BDK (never an internal settle). Its outcome is reported through the
+  standard `payment.initiated` / `payment.completed` / `payment.failed` events,
+  which now carry **`deferred_transfer_id`** on these settle payments. `user_id`
+  and `client_reference` are the original sender's.
+- `deferred_transfer.settled` is **deprecated**: no longer emitted.
+- New status `settling` (the settle payment is in flight): claim responses return
+  `settling` where they returned `settled`. `starmoney.DeferredTransferStatus`
   lists the closed set.
-- `deferred_transfer.settled` now means SENT: BDK accepted the virement and the
-  sender was debited. The recipient's credit arrives separately as their own
-  `payment.received` (sender_name filled). Keys unchanged.
-- New event `deferred_transfer.failed` (`WebhookEvent.DEFERRED_TRANSFER_FAILED`,
-  `DeferredTransferFailedPayload`) to the sending service when the settle cannot
-  go through BDK; the hold is released. `reason_code` ∈ {`bank_rejected`,
-  `hold_expired`} + a human `reason`.
+- New events `deferred_transfer.expired` (`reason_code` ∈ {`not_claimed`,
+  `recipient_kyc_incomplete`}) and `deferred_transfer.cancelled`
+  (`cancelled_by_sender`): the transfer closed unpaid, the hold was released, the
+  money is back with the sender. Typed as `DeferredTransferClosedPayload`
+  (aliases `DeferredTransferExpiredPayload` / `DeferredTransferCancelledPayload`).
+- New typed payloads for payment events: `PaymentInitiatedPayload`,
+  `PaymentRailFailedPayload` (`payment.failed` raised by StarMoney at or before the
+  rail — has `error`) and `PaymentBankStatusPayload` (`payment.accepted` /
+  `payment.completed` / `payment.failed` from BDK's status callback). All carry the
+  optional `deferred_transfer_id`.
+- The recipient's credit arrives as their own `payment.received` (sender_name
+  filled for in-network transfers).
 
 ## [0.1.21] — 2026-09-28
 
