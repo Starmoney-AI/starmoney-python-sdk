@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.1.21] — 2026-09-28
+
+### Typed payloads for `deferred_transfer.settled` and the `account.*` events
+
+- `starmoney.webhooks.DeferredTransferSettledPayload`: `user_id` is the
+  SENDER's user id (the bank delivered `""` before; bank fix S-35). It adds
+  `recipient_user_id`, `recipient_handle` and `recipient_display_name`.
+- `starmoney.webhooks.AccountLifecyclePayload` (aliases `AccountOpenedPayload`,
+  `AccountKycVerifiedPayload`, `AccountKycReviewRequiredPayload`) for
+  `account.opened` / `account.kyc.verified` / `account.kyc.review_required`.
+- `PaymentReceivedPayload.sender_name` / `source_bank_name` move from optional to
+  REQUIRED keys (value `Optional[str]`): the bank always sends them, possibly null.
+- The bank's test suite pins each delivered key set to these TypedDicts.
+  Typing only; no runtime change.
+
 ## [0.1.20] — 2026-09-27
 
 - `accounts.get_balance()` now also returns `account_reference`: the vIBAN

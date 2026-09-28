@@ -85,7 +85,15 @@ from .exceptions import (
     UP3TypeNotAccepted,
 )
 from .webhooks.events import WebhookEvent
-from .webhooks.payloads import DeferredTransferSentPayload, PaymentReceivedPayload
+from .webhooks.payloads import (
+    AccountKycReviewRequiredPayload,
+    AccountKycVerifiedPayload,
+    AccountLifecyclePayload,
+    AccountOpenedPayload,
+    DeferredTransferSentPayload,
+    DeferredTransferSettledPayload,
+    PaymentReceivedPayload,
+)
 from .webhooks.validator import WebhookValidator
 
 # Single source of truth: derive the version from the installed distribution
@@ -107,7 +115,12 @@ __all__ = [
     "WebhookValidator",
     "WebhookEvent",
     "DeferredTransferSentPayload",
+    "DeferredTransferSettledPayload",
     "PaymentReceivedPayload",
+    "AccountLifecyclePayload",
+    "AccountOpenedPayload",
+    "AccountKycVerifiedPayload",
+    "AccountKycReviewRequiredPayload",
     # Base exceptions
     "StarmoneyError",
     "APIError",

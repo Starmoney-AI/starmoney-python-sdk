@@ -75,6 +75,13 @@ class _PaymentReceivedPayloadRequired(TypedDict):
     source: str
     source_bank_code: str
     value_date: str
+    # Who paid: the deferred-transfer sender's first name on a claim credit;
+    # None when unknown (Eucalyptus virements carry no payer). Always present
+    # (possibly null) since bank 0.1.17 / 0.1.18; required as of 0.1.21.
+    sender_name: Optional[str]
+    # The sending bank's name (e.g. "SOCIETE GENERALE SENEGAL"); None on an
+    # internal deferred-transfer claim credit.
+    source_bank_name: Optional[str]
     metadata: WebhookMetadata
 
 
@@ -87,17 +94,72 @@ class PaymentReceivedPayload(_PaymentReceivedPayloadRequired, total=False):
     """
 
     client_reference: str  # ADR-004: only present when the caller supplied one
-    # Who paid: the deferred-transfer sender's first name on a claim credit;
-    # None when unknown (Eucalyptus virements carry no payer). Absent on
-    # events emitted before 0.1.17.
-    sender_name: Optional[str]
-    # The sending bank's name (e.g. "SOCIETE GENERALE SENEGAL"); None on an
-    # internal deferred-transfer claim credit. Absent before 0.1.18.
-    source_bank_name: Optional[str]
+
+
+class _DeferredTransferSettledPayloadRequired(TypedDict):
+    event_type: str  # always "deferred_transfer.settled"
+    timestamp: str
+    correlation_id: str
+    transaction_id: str  # the deferred_transfer_id
+    client_transaction_id: str
+    user_id: str  # the SENDER's user id ("" before 0.1.21 / bank S-35)
+    created_by_service: str
+    amount_minor: int
+    currency: str
+    sender_account_reference: str
+    recipient_account_reference: str
+    recipient_handle: Optional[str]  # the handle the sender addressed
+    recipient_display_name: Optional[str]  # the recipient's first name
+    recipient_user_id: Optional[str]
+    metadata: WebhookMetadata
+
+
+class DeferredTransferSettledPayload(_DeferredTransferSettledPayloadRequired, total=False):
+    """Delivered body for :attr:`WebhookEvent.DEFERRED_TRANSFER_SETTLED`.
+
+    Delivered only to the SENDING service (``created_by_service``-gated,
+    SERVICE_PRIVATE): the money reached the recipient's account — whether they
+    claimed it, opened their account (auto-claim), or completed KYC.
+    """
+
+    client_reference: str  # ADR-004: only present when the caller supplied one
+
+
+class _AccountLifecyclePayloadRequired(TypedDict):
+    event_type: str  # account.opened | account.kyc.verified | account.kyc.review_required
+    timestamp: str
+    correlation_id: str
+    user_id: str  # the account holder
+    created_by_service: str
+    account_reference: str  # the holder's vIBAN
+    account_state: str  # active_pre_kyc (opened / review_required) or verified
+    metadata: WebhookMetadata
+
+
+class AccountLifecyclePayload(_AccountLifecyclePayloadRequired, total=False):
+    """Delivered body for the account-lifecycle events (ADR-002):
+    :attr:`WebhookEvent.ACCOUNT_OPENED`, :attr:`WebhookEvent.ACCOUNT_KYC_VERIFIED`
+    and :attr:`WebhookEvent.ACCOUNT_KYC_REVIEW_REQUIRED` share one shape.
+
+    Delivered to the account's owning service (USER_PRIVATE). PII-free: no
+    name, document or rejection reason.
+    """
+
+    client_reference: str  # ADR-004: only present when the caller supplied one
+
+
+AccountOpenedPayload = AccountLifecyclePayload
+AccountKycVerifiedPayload = AccountLifecyclePayload
+AccountKycReviewRequiredPayload = AccountLifecyclePayload
 
 
 __all__ = [
     "WebhookMetadata",
     "DeferredTransferSentPayload",
+    "DeferredTransferSettledPayload",
     "PaymentReceivedPayload",
+    "AccountLifecyclePayload",
+    "AccountOpenedPayload",
+    "AccountKycVerifiedPayload",
+    "AccountKycReviewRequiredPayload",
 ]
