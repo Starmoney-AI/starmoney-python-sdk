@@ -185,9 +185,14 @@ class PaymentsResource:
             user_ref: Stable user identifier (e.g. 'whatsapp:+221771234567').
             client_transaction_id: Idempotency key. Defaults to the cart mandate
                                    id (recommended per UP3 spec).
-            consent_token: Optional user-consent-evidence override. Defaults to
-                           service_attestation (v0.1 guardrail). Do NOT pass a
-                           user-evidence type here until v0.2.
+            consent_token: The user_consent_evidence the cart carries. Defaults
+                to service_attestation (the client's word). A chat surface should
+                pass chat_session_pin_v1 {verified_at, attempt_count,
+                session_id_hash}: the bank accepts it per issuer
+                (UP3_ACCEPTED_EVIDENCE_TYPES) and measures consent freshness
+                from verified_at against confirmed_at (300 s window).
+                attempt_count is a lower bound (wrong codes typed inside a PIN
+                Flow never reach the session).
             fees_minor: Fees dict for the CartMandate (e.g. {"orchestrator": 50}).
                         Defaults to empty dict.
             intent_ttl_minutes: IntentMandate TTL (default 15, max 60).
