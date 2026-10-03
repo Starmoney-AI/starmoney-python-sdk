@@ -219,7 +219,8 @@ class PaymentsResource:
         Returns:
             Full CreatePaymentAPIResponse dict. The payment_mandate key carries
             the revision-1 PaymentMandate signed by StarMoney when the mandate
-            chain was valid.
+            chain was valid. Since 0.1.23 the dict also carries intent_mandate
+            and cart_mandate: the exact signed envelopes this call posted.
 
         Raises:
             RuntimeError: UP3 resource not configured with a secret.
@@ -290,7 +291,10 @@ class PaymentsResource:
             cart_mandate=cart,
         )
 
-        return response_data
+        # 0.1.23: hand back the exact signed envelopes that were posted, so the
+        # caller's record holds the cart it signed (confirmed_at, evidence),
+        # not just its id. Extra keys; nothing in the bank's response moves.
+        return {**response_data, "intent_mandate": intent, "cart_mandate": cart}
 
     def cart_id_for(self, idempotency_seed: str) -> str:
         """The cart.id (and client_transaction_id) a send_with_mandates call

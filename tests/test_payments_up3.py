@@ -192,6 +192,14 @@ async def test_send_with_mandates_builds_and_submits_mandates():
     assert "cart_mandate" in called_json
     assert called_json["intent_mandate"]["type"] == "intent"
     assert called_json["cart_mandate"]["type"] == "cart"
+    # 0.1.23: the exact envelopes posted come back to the caller, so its
+    # consent record can hold the cart it signed, not just the cart id.
+    assert result["intent_mandate"] is called_json["intent_mandate"]
+    assert result["cart_mandate"] is called_json["cart_mandate"]
+    assert result["cart_mandate"]["id"] == result["client_transaction_id"]
+    assert result["cart_mandate"]["payload"]["confirmed_at"]
+    assert result["cart_mandate"]["signature"]["alg"] == "HS256-JCS"
+    assert result["payment_mandate"] == pm_envelope  # the bank's keys are untouched
 
 
 # ---------------------------------------------------------------------------

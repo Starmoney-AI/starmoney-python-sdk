@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.1.23] — 2026-10-04
+
+### `send_with_mandates` returns the envelopes it signed
+
+- The returned dict now also carries `intent_mandate` and `cart_mandate`: the
+  exact signed envelopes this call posted (with your `confirmed_at` and the
+  consent evidence). Store them against your consent record instead of only
+  the cart id. Extra keys; nothing in the bank's response moves.
+
 ## [0.1.22] — 2026-10-03
 
 ### UP3 fixes for the Mandate flow (B-20)
