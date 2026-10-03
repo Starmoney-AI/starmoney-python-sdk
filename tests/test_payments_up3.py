@@ -196,7 +196,9 @@ async def test_send_with_mandates_builds_and_submits_mandates():
     # consent record can hold the cart it signed, not just the cart id.
     assert result["intent_mandate"] is called_json["intent_mandate"]
     assert result["cart_mandate"] is called_json["cart_mandate"]
-    assert result["cart_mandate"]["id"] == result["client_transaction_id"]
+    # The mocked bank response echoes the TEST's cart id; the SDK's own cart
+    # is the one it posted, so compare with the posted client_transaction_id.
+    assert result["cart_mandate"]["id"] == called_json["client_transaction_id"]
     assert result["cart_mandate"]["payload"]["confirmed_at"]
     assert result["cart_mandate"]["signature"]["alg"] == "HS256-JCS"
     assert result["payment_mandate"] == pm_envelope  # the bank's keys are untouched
