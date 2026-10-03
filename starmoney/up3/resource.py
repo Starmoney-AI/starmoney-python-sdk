@@ -121,7 +121,10 @@ class UP3Resource:
     Methods:
         build_intent(...)   — Build and sign an IntentMandate dict.
         build_cart(...)     — Build and sign a CartMandate dict.
-        verify_payment_mandate(envelope) -> bool — Verify a PaymentMandate.
+        cart_id_for(seed)   — The cart.id a seed derives to (retry / status lookup).
+        verify_payment_mandate(envelope, orchestrator_secret=...) -> bool —
+            Verify a PaymentMandate with the ORCHESTRATOR's key (not the
+            client's own secret; see the method's note).
     """
 
     def __init__(self, secret: bytes, issuer: str) -> None:
@@ -267,11 +270,7 @@ class UP3Resource:
         intent_id = intent_mandate["id"]
         intent_payload = intent_mandate["payload"]
 
-        mandate_id = (
-            _derive_cart_id(self._issuer, idempotency_seed)
-            if idempotency_seed is not None
-            else _mandate_id()
-        )
+        mandate_id = _derive_cart_id(self._issuer, idempotency_seed) if idempotency_seed is not None else _mandate_id()
         now = _now_z()
         expires = _future_z(ttl_minutes)
 
@@ -302,22 +301,41 @@ class UP3Resource:
         envelope["signature"] = sign(envelope, secret=self._secret)
         return envelope
 
-    def verify_payment_mandate(self, envelope: dict[str, Any]) -> bool:
-        """Verify the StarMoney signature on a PaymentMandate envelope.
+    def cart_id_for(self, idempotency_seed: str) -> str:
+        """The cart.id that ``build_cart(..., idempotency_seed=seed)`` derives.
 
-        Uses the same secret (v0.1 per-service shared key) to verify.
-        Returns True on a valid signature, False otherwise.
+        Same derivation as the build (``_derive_cart_id``), for callers that
+        need the id without rebuilding the cart: a status lookup after a
+        timeout, a log line before the send.
+
+        Raises:
+            ValueError: seed is empty or whitespace-only.
+        """
+        return _derive_cart_id(self._issuer, idempotency_seed)
+
+    def verify_payment_mandate(self, envelope: dict[str, Any], *, orchestrator_secret: Optional[bytes] = None) -> bool:
+        """Verify the Orchestrator's signature on a PaymentMandate envelope.
+
+        A PaymentMandate is signed by the ORCHESTRATOR (StarMoney) with its own
+        key, not by this client. Pass that key as ``orchestrator_secret`` to
+        verify. Without it the check runs against this client's own secret,
+        which is NOT the signing key in production and will return False; that
+        default exists only for sandboxes where both sides share one secret.
+        Note that any party holding an HMAC key that verifies can also forge;
+        real third-party verification arrives with asymmetric PaymentMandate
+        signatures (UP3 0.2-draft).
 
         The SDK does NOT raise on invalid signature by default — callers decide
         how to surface UP3_SIG_INVALID (log for audit, surface to user, etc.).
 
         Args:
             envelope: The full PaymentMandate dict including 'signature'.
+            orchestrator_secret: The Orchestrator's HMAC key, if you hold it.
 
         Returns:
             True if signature is valid, False otherwise.
         """
-        return verify(envelope, secret=self._secret)
+        return verify(envelope, secret=orchestrator_secret or self._secret)
 
     def verify_payment_mandate_strict(self, envelope: dict[str, Any]) -> bool:
         """Like verify_payment_mandate but raises UP3SignatureInvalid on failure.
@@ -334,7 +352,5 @@ class UP3Resource:
         result = verify(envelope, secret=self._secret)
         if not result:
             issuer = envelope.get("issuer", "unknown")
-            raise UP3SignatureInvalid(
-                f"PaymentMandate signature did not verify for issuer={issuer!r}"
-            )
+            raise UP3SignatureInvalid(f"PaymentMandate signature did not verify for issuer={issuer!r}")
         return True

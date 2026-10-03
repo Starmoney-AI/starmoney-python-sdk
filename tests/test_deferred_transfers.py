@@ -275,3 +275,19 @@ async def test_send_forwards_client_reference():
         client_reference="bot_557712",
     )
     assert http.post.call_args.kwargs["json"]["client_reference"] == "bot_557712"
+
+
+@pytest.mark.asyncio
+async def test_send_threads_user_id_to_the_request_signer():
+    """0.1.22 (B-20 S4): the sender is the JWT sub; the SDK sets it, no raw HTTP."""
+    resource, http = _make_resource()
+    mock_resp = MagicMock()
+    mock_resp.json.return_value = _DT_RESPONSE
+    http.post = AsyncMock(return_value=mock_resp)
+    await resource.send(
+        client_transaction_id="ctid-1",
+        recipient_handle="+221770000001",
+        amount_minor=5000,
+        user_id="sender-user-id",
+    )
+    assert http.post.call_args.kwargs["user_id"] == "sender-user-id"

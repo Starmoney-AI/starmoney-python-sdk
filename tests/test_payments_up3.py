@@ -403,3 +403,100 @@ async def test_send_omits_client_reference_when_not_provided():
         client_transaction_id="cid-1",
     )
     assert "client_reference" not in http.post.call_args.kwargs["json"]
+
+
+# ---------------------------------------------------------------------------
+# 0.1.22 (B-20): caller-set confirmed_at, cart_id_for, no false mandate check
+# ---------------------------------------------------------------------------
+
+
+def _resp(body):
+    mock_resp = MagicMock()
+    mock_resp.json.return_value = body
+    return mock_resp
+
+
+@pytest.mark.asyncio
+async def test_send_with_mandates_signs_the_callers_confirmed_at_into_the_cart():
+    resource, http = _make_payments_with_up3()
+    http.post = AsyncMock(return_value=_resp({"status": "validated", "payment_mandate": None}))
+
+    await resource.send_with_mandates(
+        user_id="u-1",
+        amount_minor=5000,
+        currency="XOF",
+        beneficiary_iban="SN12K00100152000025690007542",
+        beneficiary_name="Fatou",
+        description="Test",
+        user_ref="whatsapp:+221770000000",
+        confirmed_at="2026-10-03T14:23:14Z",
+    )
+
+    sent = http.post.call_args.kwargs["json"]
+    assert sent["cart_mandate"]["payload"]["confirmed_at"] == "2026-10-03T14:23:14Z"
+
+
+@pytest.mark.asyncio
+async def test_send_with_mandates_does_not_check_the_banks_signature_with_the_client_secret():
+    """The bank signs the PaymentMandate with ITS key; a check against the
+    client's secret can only fail and must not run (it was ignored anyway)."""
+    resource, http = _make_payments_with_up3()
+    unverifiable = {
+        "version": "0.1",
+        "type": "payment",
+        "id": "mnd_01KQDT03PM5H3NAHZ0167D1SFX",
+        "revision": 1,
+        "issuer": "starmoney",
+        "payload": {},
+        "signature": {"alg": "HS256-JCS", "key_id": "starmoney", "value": "not-a-signature"},
+    }
+    http.post = AsyncMock(return_value=_resp({"status": "validated", "payment_mandate": unverifiable}))
+    from unittest.mock import patch
+
+    with patch.object(resource._up3, "verify_payment_mandate") as verify:
+        result = await resource.send_with_mandates(
+            user_id="u-1",
+            amount_minor=5000,
+            currency="XOF",
+            beneficiary_iban="SN12K00100152000025690007542",
+            beneficiary_name="Fatou",
+            description="Test",
+            user_ref="whatsapp:+221770000000",
+        )
+    verify.assert_not_called()
+    assert result["payment_mandate"] is unverifiable
+
+
+def test_cart_id_for_matches_the_id_send_with_mandates_uses():
+    resource, _ = _make_payments_with_up3()
+    seed = "consent-jti-abc"
+    assert resource.cart_id_for(seed) == resource._up3.cart_id_for(seed)
+    assert resource.cart_id_for(seed).startswith("mnd_")
+    assert resource.cart_id_for(seed) == resource.cart_id_for(seed)
+    assert resource.cart_id_for(seed) != resource.cart_id_for("another-jti")
+
+
+@pytest.mark.asyncio
+async def test_cart_id_for_equals_the_cart_id_of_a_seeded_send():
+    resource, http = _make_payments_with_up3()
+    http.post = AsyncMock(return_value=_resp({"status": "validated", "payment_mandate": None}))
+    await resource.send_with_mandates(
+        user_id="u-1",
+        amount_minor=5000,
+        currency="XOF",
+        beneficiary_iban="SN12K00100152000025690007542",
+        beneficiary_name="Fatou",
+        description="Test",
+        user_ref="whatsapp:+221770000000",
+        idempotency_seed="consent-jti-abc",
+    )
+    sent = http.post.call_args.kwargs["json"]
+    assert sent["client_transaction_id"] == resource.cart_id_for("consent-jti-abc")
+    assert sent["cart_mandate"]["id"] == resource.cart_id_for("consent-jti-abc")
+
+
+def test_cart_id_for_without_up3_resource_raises():
+    from starmoney.resources.payments import PaymentsResource
+
+    with pytest.raises(RuntimeError):
+        PaymentsResource(http_client=AsyncMock()).cart_id_for("seed")

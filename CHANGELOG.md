@@ -1,5 +1,24 @@
 # Changelog
 
+## [0.1.22] — 2026-10-03
+
+### UP3 fixes for the Mandate flow (B-20)
+
+- `payments.send_with_mandates(..., confirmed_at=...)`: pass the moment the user
+  actually confirmed the terms (Flow submit / button tap, RFC 3339 Z). It is
+  signed into the cart and the bank measures consent freshness from it. The
+  default stays "now", which is only right at the tap itself.
+- `payments.cart_id_for(seed)` and `up3.cart_id_for(seed)`: the cart.id (= the
+  client_transaction_id) a seed derives to, without building a cart. Use it after
+  a timed-out `send_with_mandates`: `get_status(user_id, cart_id_for(seed))` tells
+  you whether the bank captured the payment before offering a fresh consent.
+- `send_with_mandates` no longer "verifies" the returned PaymentMandate: it
+  checked the bank's signature with the client's own secret, which can only
+  fail, and ignored the result. `up3.verify_payment_mandate(envelope,
+  orchestrator_secret=...)` stays for callers that hold the Orchestrator's key.
+- `deferred_transfers.send(..., user_id=...)`: the sender is passed to the
+  request signer, so the call no longer needs raw HTTP to set the JWT subject.
+
 ## [0.1.21] — 2026-09-28
 
 ### Typed payloads for `deferred_transfer.settled` and the `account.*` events

@@ -126,9 +126,7 @@ class PaymentsResource:
               client_transaction_id, status, last_updated, status_message,
               trigger_event, starmoney_transaction_id.
         """
-        response = await self.http.get(
-            f"/payments/status/{client_transaction_id}", user_id=user_id
-        )
+        response = await self.http.get(f"/payments/status/{client_transaction_id}", user_id=user_id)
         return response.json()
 
     async def send_with_mandates(
@@ -149,16 +147,21 @@ class PaymentsResource:
         intent_ttl_minutes: int = 15,
         cart_ttl_minutes: int = 2,
         idempotency_seed: Optional[str] = None,
+        confirmed_at: Optional[str] = None,
     ) -> dict[str, Any]:
         """
-        Build Intent + Cart mandates, submit the payment, and verify the
-        returned PaymentMandate — all in one call.
+        Build Intent + Cart mandates and submit the payment — all in one call.
 
         This is the method skills and chatbot flows should call. Internally it:
           1. Builds and signs an IntentMandate.
           2. Builds and signs a CartMandate referencing the intent.
           3. Calls POST /v1/payments with both envelopes attached.
-          4. Verifies the PaymentMandate signature in the response.
+
+        The returned PaymentMandate is NOT verified here (0.1.22). The bank signs
+        it with its own key, which this client does not hold; a check against
+        the client's secret could only ever fail, and a key that could verify
+        it could also forge it. Verification of PaymentMandates becomes possible
+        once the bank signs them with an asymmetric key (UP3 0.2-draft).
 
         The UP3 resource must be initialised with a secret (up3_secret arg on
         StarmoneyClient) for signing to work. If up3_secret is not set,
@@ -202,6 +205,11 @@ class PaymentsResource:
                 beneficiary is rejected as UP3_REPLAY (409). See
                 UP3Resource.build_cart. Omit for the legacy behaviour (fresh
                 random id every call, no retry-safety).
+            confirmed_at: RFC 3339 Z timestamp of the moment the user actually
+                confirmed these terms (the Flow submit or button tap), e.g.
+                '2026-10-03T14:23:14Z'. Signed into the cart; the bank measures
+                its consent-freshness window from it. Defaults to now, which is
+                only right when the call is made at the tap itself.
 
         Returns:
             Full CreatePaymentAPIResponse dict. The payment_mandate key carries
@@ -214,8 +222,7 @@ class PaymentsResource:
         """
         if self._up3 is None:
             raise RuntimeError(
-                "send_with_mandates requires the UP3 resource; "
-                "initialise StarmoneyClient with up3_secret=..."
+                "send_with_mandates requires the UP3 resource; " "initialise StarmoneyClient with up3_secret=..."
             )
 
         # Step 1 — build and sign IntentMandate.
@@ -230,9 +237,10 @@ class PaymentsResource:
         )
 
         # Step 2 — build and sign CartMandate.
-        import datetime as _dt
+        if confirmed_at is None:
+            import datetime as _dt
 
-        confirmed_at = _dt.datetime.now(_dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+            confirmed_at = _dt.datetime.now(_dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
         cart = self._up3.build_cart(
             intent,
             amount_minor=amount_minor,
@@ -277,9 +285,21 @@ class PaymentsResource:
             cart_mandate=cart,
         )
 
-        # Step 4 — verify the returned PaymentMandate.
-        payment_mandate = response_data.get("payment_mandate")
-        if payment_mandate is not None:
-            self._up3.verify_payment_mandate(payment_mandate)
-
         return response_data
+
+    def cart_id_for(self, idempotency_seed: str) -> str:
+        """The cart.id (and client_transaction_id) a send_with_mandates call
+        with this idempotency_seed uses, without building anything.
+
+        A timed-out send_with_mandates returns nothing, yet the bank may have
+        executed it (a 201 is written before the rail is called). Compute the
+        id from the seed you used and ask ``get_status(user_id, cart_id)``:
+        found means the payment is in flight; not found after a short wait
+        means nothing was captured and a fresh consent may be offered.
+
+        Raises:
+            RuntimeError: UP3 resource not configured.
+        """
+        if self._up3 is None:
+            raise RuntimeError("cart_id_for requires the UP3 resource; initialise StarmoneyClient with up3_secret=...")
+        return self._up3.cart_id_for(idempotency_seed)
