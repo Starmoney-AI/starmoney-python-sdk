@@ -5,6 +5,7 @@ Async HTTP client wrapper for StarMoney API with automatic authentication,
 error handling, and correlation ID generation.
 """
 
+import re
 import uuid
 from typing import Any, Optional
 import httpx
@@ -25,6 +26,7 @@ from .exceptions import (
     AccountNotPayableError,
     LedgerUnavailableError,
     UP3_ERROR_CODE_MAP,
+    UP3Error,
 )
 
 
@@ -63,9 +65,7 @@ class HTTPClient:
 
     async def __aenter__(self) -> "HTTPClient":
         """Async context manager entry."""
-        self._client = httpx.AsyncClient(
-            timeout=self.timeout, follow_redirects=self.follow_redirects
-        )
+        self._client = httpx.AsyncClient(timeout=self.timeout, follow_redirects=self.follow_redirects)
         return self
 
     async def __aexit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
@@ -76,14 +76,10 @@ class HTTPClient:
     def _get_client(self) -> httpx.AsyncClient:
         """Get or create HTTP client."""
         if self._client is None:
-            self._client = httpx.AsyncClient(
-                timeout=self.timeout, follow_redirects=self.follow_redirects
-            )
+            self._client = httpx.AsyncClient(timeout=self.timeout, follow_redirects=self.follow_redirects)
         return self._client
 
-    def _add_headers(
-        self, headers: Optional[dict[str, str]], user_id: Optional[str] = None
-    ) -> dict[str, str]:
+    def _add_headers(self, headers: Optional[dict[str, str]], user_id: Optional[str] = None) -> dict[str, str]:
         """
         Add authentication and correlation ID headers.
 
@@ -162,6 +158,14 @@ class HTTPClient:
         if up3_code and up3_code in UP3_ERROR_CODE_MAP:
             exc_cls = UP3_ERROR_CODE_MAP[up3_code]
             raise exc_cls(message, error_data)
+        # A UP3_* code this SDK does not know yet (a newer verifier) is still a
+        # protocol refusal, never a "duplicate" or a bare APIError: surface it
+        # as UP3Error with the code set, so callers can branch on `.code`.
+        unknown_up3 = re.search(r"\b(UP3_[A-Z_]+)\b", message) if isinstance(message, str) else None
+        if unknown_up3:
+            exc = UP3Error(message, error_data)
+            exc.code = unknown_up3.group(1)
+            raise exc
 
         # Map HTTP status codes to domain exceptions
         if response.status_code == 400:
@@ -222,9 +226,7 @@ class HTTPClient:
         """Make GET request."""
         return await self.request("GET", path, user_id=user_id, **kwargs)
 
-    async def post(
-        self, path: str, user_id: Optional[str] = None, **kwargs: Any
-    ) -> httpx.Response:
+    async def post(self, path: str, user_id: Optional[str] = None, **kwargs: Any) -> httpx.Response:
         """Make POST request."""
         return await self.request("POST", path, user_id=user_id, **kwargs)
 
@@ -232,9 +234,7 @@ class HTTPClient:
         """Make PUT request."""
         return await self.request("PUT", path, user_id=user_id, **kwargs)
 
-    async def delete(
-        self, path: str, user_id: Optional[str] = None, **kwargs: Any
-    ) -> httpx.Response:
+    async def delete(self, path: str, user_id: Optional[str] = None, **kwargs: Any) -> httpx.Response:
         """Make DELETE request."""
         return await self.request("DELETE", path, user_id=user_id, **kwargs)
 

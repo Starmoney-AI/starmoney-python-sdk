@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.1.24] — 2026-10-04
+
+### UP3 refusals are UP3 errors, never "duplicates"
+
+- New exceptions `UP3MandateRequired` (409, profile P9), `UP3PayerMismatch` (409,
+  P2), `UP3IssuerMismatch` (409, P3) and `UP3TypeRequiredMissing` (422, P10). A
+  409 carrying one of these codes used to surface as `DuplicateResourceError`,
+  whose name says "already exists" — a caller mapping that to "already done"
+  would tell a customer money left when nothing was sent.
+- Any `UP3_*` code this SDK does not know yet is raised as `UP3Error` with
+  `.code` set, never as `DuplicateResourceError` or a bare `APIError`.
+
 ## [0.1.23] — 2026-10-04
 
 ### `send_with_mandates` returns the envelopes it signed

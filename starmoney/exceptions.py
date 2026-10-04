@@ -19,9 +19,7 @@ class APIError(StarmoneyError):
         response_data: Full response data from API
     """
 
-    def __init__(
-        self, status_code: int, message: str, response_data: Optional[dict[str, Any]] = None
-    ):
+    def __init__(self, status_code: int, message: str, response_data: Optional[dict[str, Any]] = None):
         self.status_code = status_code
         self.message = message
         self.response_data = response_data or {}
@@ -260,7 +258,44 @@ class UP3RevisionRegression(UP3Error):
 
 
 # Map error code strings -> exception classes for http_client error handling.
+class UP3MandateRequired(UP3Error):
+    """UP3_MANDATE_REQUIRED — the verifier's policy flags your issuer as
+    mandate-required and this payment carried no Intent + Cart chain (HTTP 409).
+
+    A refusal: nothing was sent, nothing was written. It is NOT a duplicate.
+    (0.2-draft staging profile P9.)
+    """
+
+    code = "UP3_MANDATE_REQUIRED"
+
+
+class UP3PayerMismatch(UP3Error):
+    """UP3_PAYER_MISMATCH — cart.user_ref does not resolve to the authenticated
+    payer (HTTP 409). A refusal, nothing written. (Profile P2.)"""
+
+    code = "UP3_PAYER_MISMATCH"
+
+
+class UP3IssuerMismatch(UP3Error):
+    """UP3_ISSUER_MISMATCH — cart.issuer is not the authenticated caller
+    (HTTP 409). A refusal, nothing written. (Profile P3.)"""
+
+    code = "UP3_ISSUER_MISMATCH"
+
+
+class UP3TypeRequiredMissing(UP3Error):
+    """UP3_TYPE_REQUIRED_MISSING — the verifier requires a consent-evidence type
+    for your issuer and the cart carries a different, merely accepted, one
+    (HTTP 422). (Profile P10.)"""
+
+    code = "UP3_TYPE_REQUIRED_MISSING"
+
+
 UP3_ERROR_CODE_MAP: dict[str, type[UP3Error]] = {
+    "UP3_MANDATE_REQUIRED": UP3MandateRequired,
+    "UP3_PAYER_MISMATCH": UP3PayerMismatch,
+    "UP3_ISSUER_MISMATCH": UP3IssuerMismatch,
+    "UP3_TYPE_REQUIRED_MISSING": UP3TypeRequiredMissing,
     "UP3_SIG_INVALID": UP3SignatureInvalid,
     "UP3_KEY_NOT_REGISTERED": UP3KeyNotRegistered,
     "UP3_CHAIN_BROKEN": UP3ChainBroken,
