@@ -257,7 +257,6 @@ class UP3RevisionRegression(UP3Error):
     code = "UP3_REVISION_REGRESSION"
 
 
-# Map error code strings -> exception classes for http_client error handling.
 class UP3MandateRequired(UP3Error):
     """UP3_MANDATE_REQUIRED — the verifier's policy flags your issuer as
     mandate-required and this payment carried no Intent + Cart chain (HTTP 409).
@@ -291,6 +290,7 @@ class UP3TypeRequiredMissing(UP3Error):
     code = "UP3_TYPE_REQUIRED_MISSING"
 
 
+# Map error code strings -> exception classes for http_client error handling.
 UP3_ERROR_CODE_MAP: dict[str, type[UP3Error]] = {
     "UP3_MANDATE_REQUIRED": UP3MandateRequired,
     "UP3_PAYER_MISMATCH": UP3PayerMismatch,
