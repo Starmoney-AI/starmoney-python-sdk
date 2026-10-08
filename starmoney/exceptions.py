@@ -116,7 +116,8 @@ class DuplicateResourceError(APIError):
         ``beneficiary_id`` (an active beneficiary with that IBAN) or
         ``beneficiary_request_id`` (a pending request for that number)."""
         d = self.response_data or {}
-        detail = d.get("detail") if isinstance(d.get("detail"), dict) else d
+        legacy = d.get("detail") if isinstance(d.get("detail"), dict) else {}
+        detail = {**legacy, **{k: v for k, v in d.items() if k != "detail"}}
         if not isinstance(detail, dict):
             return None
         return detail.get("beneficiary_id") or detail.get("beneficiary_request_id")
@@ -197,7 +198,8 @@ class BeneficiaryAddLimitReachedError(APIError):
     @property
     def retry_after_seconds(self) -> Optional[int]:
         d = self.response_data or {}
-        detail = d.get("detail") if isinstance(d.get("detail"), dict) else d
+        legacy = d.get("detail") if isinstance(d.get("detail"), dict) else {}
+        detail = {**legacy, **{k: v for k, v in d.items() if k != "detail"}}
         if not isinstance(detail, dict):
             return None
         value = detail.get("retry_after_seconds")
