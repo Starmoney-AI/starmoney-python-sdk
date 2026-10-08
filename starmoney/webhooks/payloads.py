@@ -149,12 +149,60 @@ class AccountLifecyclePayload(_AccountLifecyclePayloadRequired, total=False):
 
 
 AccountOpenedPayload = AccountLifecyclePayload
+
+
+class _BeneficiaryAddedRequired(TypedDict):
+    event_type: str  # beneficiary.added
+    timestamp: str
+    correlation_id: str
+    user_id: str  # the saver
+    created_by_service: str
+    beneficiary_id: str
+    beneficiary_request_id: str
+    name: str  # the saver's own label
+    phone_number: str  # E.164 (normalised)
+    iban: str  # the holder's new vIBAN
+    kind: str  # "starmoney"
+    activated_at: str
+    metadata: WebhookMetadata
+
+
+class BeneficiaryAddedPayload(_BeneficiaryAddedRequired, total=False):
+    """Delivered body for :attr:`WebhookEvent.BENEFICIARY_ADDED` (B-27 contract
+    §4): a pending request became a beneficiary. USER_PRIVATE, routed to the
+    saver's service. ``client_reference`` only when the saver supplied one."""
+
+    client_reference: str
+
+
+class _BeneficiaryRequestExpiredRequired(TypedDict):
+    event_type: str  # beneficiary_request.expired
+    timestamp: str
+    correlation_id: str
+    user_id: str  # the saver
+    created_by_service: str
+    beneficiary_request_id: str
+    name: str
+    phone_number: str
+    saved_at: str
+    expired_at: str
+    reason: str  # "no_account"
+    metadata: WebhookMetadata
+
+
+class BeneficiaryRequestExpiredPayload(_BeneficiaryRequestExpiredRequired, total=False):
+    """Delivered body for :attr:`WebhookEvent.BENEFICIARY_REQUEST_EXPIRED`
+    (B-27 contract §4). USER_PRIVATE, routed to the saver's service."""
+
+    client_reference: str
 AccountKycVerifiedPayload = AccountLifecyclePayload
 AccountKycReviewRequiredPayload = AccountLifecyclePayload
 
 
 __all__ = [
     "WebhookMetadata",
+    "BeneficiaryAddedPayload",
+    "BeneficiaryRequestExpiredPayload",
     "DeferredTransferSentPayload",
     "DeferredTransferSettledPayload",
     "PaymentReceivedPayload",

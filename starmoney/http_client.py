@@ -17,6 +17,9 @@ from .exceptions import (
     PaymentNotFoundError,
     DuplicateResourceError,
     InvalidIBANError,
+    SelfTransferNotAllowedError,
+    InvalidPhoneError,
+    BeneficiaryAddLimitReachedError,
     PreKycCeilingExceededError,
     PreKycTotalCeilingExceededError,
     RateLimitError,
@@ -135,6 +138,14 @@ class HTTPClient:
             error_code = error_data.get("error_code") or detail_code
         if error_code == "INVALID_IBAN":
             raise InvalidIBANError(message, error_data, response.status_code)
+        if error_code == "INVALID_PHONE":
+            raise InvalidPhoneError(response.status_code, message, error_data)
+        if error_code == "SELF_TRANSFER_NOT_ALLOWED":
+            raise SelfTransferNotAllowedError(response.status_code, message, error_data)
+        if error_code == "BENEFICIARY_ADD_LIMIT_REACHED":
+            raise BeneficiaryAddLimitReachedError(response.status_code, message, error_data)
+        if error_code in ("DUPLICATE_BENEFICIARY", "BENEFICIARY_ACCOUNT_CLOSED"):
+            raise DuplicateResourceError(response.status_code, message, error_data)
         if error_code == "PRE_KYC_TOTAL_CEILING_EXCEEDED":
             raise PreKycTotalCeilingExceededError(response.status_code, message, error_data)
         if error_code == "PRE_KYC_CEILING_EXCEEDED":

@@ -24,15 +24,25 @@ class BeneficiariesResource:
         self,
         user_id: str,
         name: str,
-        iban: str,
+        iban: Optional[str] = None,
         bank_name: Optional[str] = None,
         phone_number: Optional[str] = None,
         email: Optional[str] = None,
         is_favorite: bool = False,
         metadata: Optional[dict[str, Any]] = None,
+        phone: Optional[str] = None,
+        client_reference: Optional[str] = None,
     ) -> dict[str, Any]:
         """
-        Create a new beneficiary for user.
+        Create a new beneficiary for user, by IBAN or by phone (B-27).
+
+        Exactly one of ``iban`` or ``phone``. By phone: 201 when the number's
+        holder already has a StarMoney account (the dict carries status
+        "active", kind "starmoney" and the holder's vIBAN as ``iban``);
+        202 when not (status "pending", ``beneficiary_request_id``,
+        ``expires_at``): the request becomes a beneficiary when the account
+        opens (webhook ``beneficiary.added``) or expires after 7 days
+        (``beneficiary_request.expired``).
 
         Args:
             user_id: User ID who owns this beneficiary.
@@ -58,14 +68,21 @@ class BeneficiariesResource:
         # Fast-fail on a bad IBAN before the round-trip. Full ISO 13616 mod-97,
         # so a mistyped-but-well-formed IBAN is caught here too. The server
         # re-validates — this is a convenience, not the source of truth.
-        if not is_valid_iban(iban):
+        if (iban is None) == (phone is None):
+            raise ValueError("exactly one of iban or phone is required")
+        if iban is not None and not is_valid_iban(iban):
             raise InvalidIBANError(f"Invalid IBAN: {iban!r} failed mod-97 validation")
 
         payload: dict[str, Any] = {
             "name": name,
-            "iban": iban,
             "is_favorite": is_favorite,
         }
+        if iban is not None:
+            payload["iban"] = iban
+        if phone is not None:
+            payload["phone"] = phone
+        if client_reference is not None:
+            payload["client_reference"] = client_reference
         if bank_name is not None:
             payload["bank_name"] = bank_name
         if phone_number is not None:
@@ -84,6 +101,7 @@ class BeneficiariesResource:
         page: int = 1,
         page_size: int = 50,
         include_inactive: bool = False,
+        status: str = "all",
     ) -> dict[str, Any]:
         """
         List beneficiaries for a user with pagination.
@@ -95,6 +113,8 @@ class BeneficiariesResource:
             page: Page number (1-based, default 1).
             page_size: Items per page (max 100, default 50).
             include_inactive: If True, include soft-deleted beneficiaries.
+            status: "all" (default) | "active" | "pending". Pending items (B-27)
+                have iban None and carry beneficiary_request_id + expires_at.
 
         Returns:
             BeneficiaryListResponse dict with keys:
@@ -104,6 +124,7 @@ class BeneficiariesResource:
             "page": page,
             "page_size": page_size,
             "include_inactive": str(include_inactive).lower(),
+            "status": status,
         }
         response = await self.http.get("/beneficiaries", params=params, user_id=user_id)
         return response.json()

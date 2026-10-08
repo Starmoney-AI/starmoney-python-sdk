@@ -67,6 +67,18 @@ class WebhookEvent(str, Enum):
     ACCOUNT_KYC_REVIEW_REQUIRED = "account.kyc.review_required"
 
     # -----------------------------------------------------------------
+    # Beneficiaries by phone — sensitivity: USER_PRIVATE (B-27)
+    # -----------------------------------------------------------------
+    BENEFICIARY_ADDED = "beneficiary.added"
+    """A pending beneficiary request became a beneficiary: the number's holder
+    opened a StarMoney account. Delivered to the saver's own service; carries
+    the saver's label and the new vIBAN, nothing about the holder."""
+
+    BENEFICIARY_REQUEST_EXPIRED = "beneficiary_request.expired"
+    """Nobody opened an account for the saved number within 7 days. Delivered
+    to the saver's own service; ``reason`` is ``no_account``."""
+
+    # -----------------------------------------------------------------
     # Inbound credit — sensitivity: USER_PRIVATE
     # -----------------------------------------------------------------
     PAYMENT_RECEIVED = "payment.received"

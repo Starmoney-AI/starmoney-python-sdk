@@ -10,6 +10,7 @@ from .auth import AuthManager
 from .http_client import HTTPClient
 from .resources.accounts import AccountsResource
 from .resources.beneficiaries import BeneficiariesResource
+from .resources.beneficiary_requests import BeneficiaryRequestsResource
 from .resources.deferred_transfers import DeferredTransfersResource
 from .resources.payments import PaymentsResource
 from .resources.webhooks import WebhooksResource
@@ -116,6 +117,7 @@ class StarmoneyClient:
         self._beneficiaries: Optional[BeneficiariesResource] = None
         self._payments: Optional[PaymentsResource] = None
         self._deferred_transfers: Optional[DeferredTransfersResource] = None
+        self._beneficiary_requests: Optional[BeneficiaryRequestsResource] = None
         self._webhooks: Optional[WebhooksResource] = None
 
     @property
@@ -124,6 +126,13 @@ class StarmoneyClient:
         if self._accounts is None:
             self._accounts = AccountsResource(self._http_client)
         return self._accounts
+
+    @property
+    def beneficiary_requests(self) -> BeneficiaryRequestsResource:
+        """Pending beneficiary requests (a saved number with no account yet, B-27)."""
+        if self._beneficiary_requests is None:
+            self._beneficiary_requests = BeneficiaryRequestsResource(self._http_client)
+        return self._beneficiary_requests
 
     @property
     def beneficiaries(self) -> BeneficiariesResource:

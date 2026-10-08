@@ -68,13 +68,16 @@ _EXPECTED_BROADCASTABLE_EVENTS = {
     "account.kyc.review_required",
     # Inbound credit
     "payment.received",
+    # Beneficiaries by phone (B-27)
+    "beneficiary.added",
+    "beneficiary_request.expired",
 }
 
 
 def test_webhook_event_catalog_matches_server_broadcastable_set():
     actual = {member.value for member in WebhookEvent}
     assert actual == _EXPECTED_BROADCASTABLE_EVENTS
-    assert len(_EXPECTED_BROADCASTABLE_EVENTS) == 16
+    assert len(_EXPECTED_BROADCASTABLE_EVENTS) == 18
 
 
 # ---------------------------------------------------------------------------

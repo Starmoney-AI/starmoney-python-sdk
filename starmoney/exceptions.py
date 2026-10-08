@@ -51,6 +51,17 @@ class DuplicateResourceError(APIError):
     alongside the 409.
     """
 
+    @property
+    def existing_id(self) -> Optional[str]:
+        """Id of the row that already exists, when the server names it:
+        ``beneficiary_id`` (an active beneficiary with that IBAN) or
+        ``beneficiary_request_id`` (a pending request for that number)."""
+        d = self.response_data or {}
+        detail = d.get("detail") if isinstance(d.get("detail"), dict) else d
+        if not isinstance(detail, dict):
+            return None
+        return detail.get("beneficiary_id") or detail.get("beneficiary_request_id")
+
     pass
 
 
@@ -105,6 +116,33 @@ class PreKycTotalCeilingExceededError(APIError):
     @property
     def remaining_minor(self) -> Optional[int]:
         return self.response_data.get("remaining_minor")
+
+
+class SelfTransferNotAllowedError(APIError):
+    """422 ``SELF_TRANSFER_NOT_ALLOWED`` — the number, handle or vIBAN is the
+    caller's own (B-27 contract §1/§5). Raised by ``beneficiaries.create``,
+    ``payments.*`` and ``deferred_transfers.send``. Exception on the server:
+    the customer's own linked bank account, by IBAN."""
+
+
+class InvalidPhoneError(APIError):
+    """422 ``INVALID_PHONE`` — the phone number failed normalisation
+    (libphonenumber). ``response_data["detail"]["errors"]`` names the field."""
+
+
+class BeneficiaryAddLimitReachedError(APIError):
+    """429 ``BENEFICIARY_ADD_LIMIT_REACHED`` — more than 20 phone/handle adds
+    in the rolling 24 h (201 and 202 both count). ``retry_after_seconds`` says
+    when the oldest add leaves the window."""
+
+    @property
+    def retry_after_seconds(self) -> Optional[int]:
+        d = self.response_data or {}
+        detail = d.get("detail") if isinstance(d.get("detail"), dict) else d
+        if not isinstance(detail, dict):
+            return None
+        value = detail.get("retry_after_seconds")
+        return int(value) if value is not None else None
 
 
 class RateLimitError(APIError):

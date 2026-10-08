@@ -1,5 +1,25 @@
 # Changelog
 
+## [0.1.25] — 2026-10-08
+
+### Beneficiaries by phone (B-27)
+
+- `beneficiaries.create(user_id, name, phone=..., client_reference=...)`: save a
+  number. 201 when its holder already has a StarMoney account (status `active`,
+  `iban` = their vIBAN); 202 when not (status `pending`, `beneficiary_request_id`,
+  `expires_at`). `iban` is now optional; exactly one of `iban` / `phone`.
+- `beneficiaries.list(user_id, status="all" | "active" | "pending")`: one list; pending
+  items have `iban` `None` and carry `beneficiary_request_id` + `expires_at`.
+- New resource `client.beneficiary_requests`: `get`, `cancel`, `invite` (records
+  `invited_at`; the consumer sends the template).
+- New webhook events `beneficiary.added` and `beneficiary_request.expired`
+  (`BeneficiaryAddedPayload`, `BeneficiaryRequestExpiredPayload`).
+- New exceptions `SelfTransferNotAllowedError` (422), `InvalidPhoneError` (422),
+  `BeneficiaryAddLimitReachedError` (429, `.retry_after_seconds`);
+  `DuplicateResourceError.existing_id` names the existing beneficiary or request.
+  `BENEFICIARY_ACCOUNT_CLOSED` (409, a send to a closed holder) is a
+  `DuplicateResourceError` with that code in `response_data`.
+
 ## [0.1.24] — 2026-10-04
 
 ### UP3 refusals are UP3 errors, never "duplicates"
