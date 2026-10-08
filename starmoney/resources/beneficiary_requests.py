@@ -5,7 +5,7 @@ the server answers 202; this resource reads, cancels and marks the invite.
 
 from typing import Any
 
-from starmoney.http_client import HTTPClient
+from ..http_client import HTTPClient
 
 
 class BeneficiaryRequestsResource:
