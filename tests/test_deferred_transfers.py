@@ -252,8 +252,29 @@ async def test_cancel_calls_correct_path_with_user_id():
     http.post.assert_called_once_with(
         "/deferred-transfers/dt-uuid-1/cancel",
         user_id="user-1",
+        json={},
     )
     assert result["status"] == "cancelled"
+
+
+@pytest.mark.asyncio
+async def test_cancel_forwards_reason_in_the_body():
+    resource, http = _make_resource()
+    mock_resp = MagicMock()
+    mock_resp.json.return_value = {**_DT_RESPONSE, "status": "cancelled"}
+    http.post = AsyncMock(return_value=mock_resp)
+
+    await resource.cancel(
+        deferred_transfer_id="dt-uuid-1",
+        user_id="user-1",
+        reason="recipient_unreachable",
+    )
+
+    http.post.assert_called_once_with(
+        "/deferred-transfers/dt-uuid-1/cancel",
+        user_id="user-1",
+        json={"reason": "recipient_unreachable"},
+    )
 
 
 @pytest.mark.asyncio

@@ -1,5 +1,35 @@
 # Changelog
 
+## [0.1.26] — 2026-10-08
+
+### Explainable errors (B-32) — breaking response-shape change
+
+- The server's error body is now ONE flat shape:
+  `{"error_code", "kind", "detail", "error_id", "errors"}`. **`detail` is
+  now always a string** — the old `{"detail": {"message", "error_code",
+  ...}}` nesting some consumers read via `response_data["detail"]["error_code"]`
+  is retired. Every extra field an error carries (`retry_after_seconds`,
+  `beneficiary_id`, `beneficiary_request_id`, `ceiling_minor`,
+  `consumed_minor`, `pending_minor`, `remaining_minor`, `currency`,
+  `lifts_on`, `cancel_reason`, ...) is now a top-level key too, never nested.
+  See `docs/ERRORS.md` in starmoney-bank-service for the full contract.
+- Every `APIError`/`UP3Error` (sub)class gains `.error_code` (`""` when the
+  server didn't send one), `.kind` (`"validation"` | `"state"` |
+  `"technical"`, defaulted by HTTP status when the server omits it),
+  `.errors` (a list, **never** `None` — `[]` when there is none) and
+  `.error_id`. Parsing accepts BOTH the new flat shape and the legacy nested
+  `detail` dict, so pinned-old-server consumers keep working during rollout.
+- `InvalidPhoneError.errors[0]["rule"]` is now `"phone.normalisation"` or
+  `"phone.region"`; `InvalidIBANError.errors[0]["rule"]` is one of
+  `"iban.format"` / `"iban.length"` / `"iban.country"` / `"iban.checksum"`.
+
+### Deferred-transfer cancel reason (B-44)
+
+- `deferred_transfers.cancel(deferred_transfer_id, user_id, reason=None)` —
+  `reason` is `"recipient_unreachable"` or `"sender_request"` (server
+  default when omitted). The response's `cancel_reason` echoes the effective
+  value. An unrecognised `reason` raises `ValidationError` (422).
+
 ## [0.1.25] — 2026-10-08
 
 ### Beneficiaries by phone (B-27)

@@ -3,6 +3,39 @@
 from typing import Any, Optional
 
 
+def _default_kind_for_status(status_code: int) -> str:
+    """Best-effort ``kind`` when the server's response doesn't carry one
+    (legacy body, or a status this SDK doesn't recognise) — see B-32."""
+    if status_code in (400, 422):
+        return "validation"
+    if status_code in (403, 404, 409, 429):
+        return "state"
+    if status_code >= 500:
+        return "technical"
+    return "validation"
+
+
+def _parse_envelope(response_data: Optional[dict[str, Any]], status_code: int) -> dict[str, Any]:
+    """Parse the B-32 error envelope — flat (current server) or nested under
+    ``detail`` (legacy server) — into ``{error_code, kind, errors, error_id}``.
+
+    Always returns ``errors`` as a list (never ``None``).
+    """
+    data = response_data or {}
+    nested = data.get("detail") if isinstance(data.get("detail"), dict) else {}
+
+    error_code = data.get("error_code") or nested.get("error_code") or ""
+    kind = data.get("kind") or nested.get("kind") or _default_kind_for_status(status_code)
+    errors = data.get("errors")
+    if errors is None:
+        errors = nested.get("errors")
+    if not isinstance(errors, list):
+        errors = []
+    error_id = data.get("error_id") or nested.get("error_id")
+
+    return {"error_code": error_code, "kind": kind, "errors": errors, "error_id": error_id}
+
+
 class StarmoneyError(Exception):
     """Base exception for all StarMoney SDK errors."""
 
@@ -17,12 +50,24 @@ class APIError(StarmoneyError):
         status_code: HTTP status code
         message: Error message
         response_data: Full response data from API
+        error_code: Machine-readable code from the B-32 envelope ("" when
+            the server didn't send one — e.g. a transport-level failure).
+        kind: One of "validation" | "state" | "technical" (B-32). Parsed from
+            the envelope when present, else a best-effort default by status.
+        errors: Field-level detail list from the envelope. Never ``None`` —
+            ``[]`` when there is none.
+        error_id: The server's correlation id for this error, when present.
     """
 
     def __init__(self, status_code: int, message: str, response_data: Optional[dict[str, Any]] = None):
         self.status_code = status_code
         self.message = message
         self.response_data = response_data or {}
+        envelope = _parse_envelope(self.response_data, status_code)
+        self.error_code: str = envelope["error_code"]
+        self.kind: str = envelope["kind"]
+        self.errors: list[dict[str, Any]] = envelope["errors"]
+        self.error_id: Optional[str] = envelope["error_id"]
         super().__init__(f"[{status_code}] {message}")
 
 
@@ -198,7 +243,16 @@ class InvalidSignatureError(StarmoneyError):
 
 
 class UP3Error(StarmoneyError):
-    """Base class for all UP3 protocol errors surfaced by the SDK."""
+    """Base class for all UP3 protocol errors surfaced by the SDK.
+
+    Carries the same B-32 attributes as ``APIError`` (``error_code``,
+    ``kind``, ``errors``, ``error_id``) so callers can branch on them
+    uniformly regardless of whether the server refused with a UP3_* code or
+    any other domain error. ``error_code`` defaults to ``self.code`` (the
+    UP3-specific identifier, e.g. ``"UP3_SIG_INVALID"``) when the response
+    doesn't carry its own — which is the common case, since the server's
+    UP3Error.error_code IS ``exc.code``.
+    """
 
     code: str = "UP3_UNKNOWN"
 
@@ -206,6 +260,11 @@ class UP3Error(StarmoneyError):
         super().__init__(message)
         self.message = message
         self.response_data = response_data or {}
+        envelope = _parse_envelope(self.response_data, 422)
+        self.error_code: str = envelope["error_code"] or self.code
+        self.kind: str = envelope["kind"]
+        self.errors: list[dict[str, Any]] = envelope["errors"]
+        self.error_id: Optional[str] = envelope["error_id"]
 
     def __str__(self) -> str:
         return f"{self.code}: {self.message}" if self.message else self.code

@@ -208,6 +208,7 @@ class DeferredTransfersResource:
         self,
         deferred_transfer_id: str,
         user_id: str,
+        reason: Optional[Literal["recipient_unreachable", "sender_request"]] = None,
     ) -> dict[str, Any]:
         """
         Cancel a RESERVED or ARMED deferred transfer, recovering locked funds.
@@ -225,17 +226,24 @@ class DeferredTransfersResource:
         Args:
             deferred_transfer_id: UUID of the deferred transfer to cancel.
             user_id: The authenticated sender's user ID (drives JWT sub claim).
+            reason: Why the sender is cancelling (B-44). ``None`` (default)
+                lets the server default to ``"sender_request"``.
 
         Returns:
-            DeferredTransferResponse dict with status='cancelled'.
+            DeferredTransferResponse dict with status='cancelled' and
+            cancel_reason set to the effective reason.
 
         Raises:
             PaymentNotFoundError (404): Transfer not found or caller is not sender.
             DuplicateResourceError (409): Transfer cannot be cancelled (already
                 claimed, settled, expired, etc.).
+            ValidationError (422): ``reason`` is not one of the two accepted values.
         """
+        payload: dict[str, Any] = {"reason": reason} if reason is not None else {}
+
         response = await self.http.post(
             f"/deferred-transfers/{deferred_transfer_id}/cancel",
             user_id=user_id,
+            json=payload,
         )
         return response.json()
