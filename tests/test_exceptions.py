@@ -2,8 +2,12 @@
 (sdk/python/starmoney/exceptions.py, 0.1.26).
 
 Every APIError/UP3Error (sub)class exposes `.error_code`, `.kind`, `.errors`
-(always a list, never None) and `.error_id`, parsed from either the flat
-envelope (current server) or the legacy nested `detail` dict (old server).
+(always a list, never None), `.error_id` and `.message`, parsed from either
+the flat envelope (current server) or the legacy nested `detail` dict (old
+server). For this release only, the server's `detail` is itself an object
+`{"message", "error_code", "errors"}` (a one-release compat shim — see
+docs/ERRORS.md in starmoney-bank-service); `.message` prefers the top-level
+`message` key and falls back to `detail.message`.
 """
 
 from __future__ import annotations
@@ -29,24 +33,47 @@ from starmoney.exceptions import (
 # ---------------------------------------------------------------------------
 
 
-def test_flat_envelope_parses_error_code_kind_errors_error_id():
+def test_flat_envelope_parses_error_code_kind_errors_error_id_message():
+    errors = [{"field": "iban", "rule": "iban.checksum", "expected": "mod-97 remainder 1", "received": "SN12X"}]
     body = {
         "error_code": "INVALID_IBAN",
         "kind": "validation",
-        "detail": "Invalid IBAN (iban.checksum)",
+        "message": "Invalid IBAN (iban.checksum)",
         "error_id": "corr-123",
-        "errors": [{"field": "iban", "rule": "iban.checksum", "expected": "mod-97 remainder 1", "received": "SN12X"}],
+        "errors": errors,
+        # One-release legacy compat object — mirrors the top-level keys.
+        "detail": {"message": "Invalid IBAN (iban.checksum)", "error_code": "INVALID_IBAN", "errors": errors},
     }
-    err = InvalidIBANError(body["detail"], body, 422)
+    err = InvalidIBANError(body["message"], body, 422)
 
     assert err.error_code == "INVALID_IBAN"
     assert err.kind == "validation"
     assert err.error_id == "corr-123"
-    assert err.errors == [
-        {"field": "iban", "rule": "iban.checksum", "expected": "mod-97 remainder 1", "received": "SN12X"}
-    ]
+    assert err.message == "Invalid IBAN (iban.checksum)"
+    assert err.errors == errors
     # The rule is reachable at the documented path.
     assert err.errors[0]["rule"] == "iban.checksum"
+
+
+def test_top_level_message_wins_over_detail_message():
+    body = {
+        "error_code": "INVALID_IBAN",
+        "message": "top-level text",
+        "detail": {"message": "stale detail text", "error_code": "INVALID_IBAN", "errors": []},
+    }
+    err = APIError(422, "constructor fallback", body)
+    assert err.message == "top-level text"
+
+
+def test_message_falls_back_to_detail_message_when_top_level_absent():
+    body = {"detail": {"message": "only in detail", "error_code": "X", "errors": []}}
+    err = APIError(422, "constructor fallback", body)
+    assert err.message == "only in detail"
+
+
+def test_message_falls_back_to_constructor_arg_when_envelope_has_none():
+    err = APIError(500, "constructor fallback", {"error_code": "X"})
+    assert err.message == "constructor fallback"
 
 
 def test_errors_is_always_a_list_never_none_when_absent():
@@ -82,6 +109,7 @@ def test_legacy_nested_detail_dict_is_still_parsed():
     assert err.error_code == "INVALID_PHONE"
     assert err.kind == "validation"
     assert err.error_id == "corr-legacy"
+    assert err.message == "Invalid phone number"
     assert err.errors == [{"field": "phone", "rule": "phone.normalisation", "received": "nope"}]
 
 
@@ -136,6 +164,8 @@ def test_every_api_error_subclass_exposes_the_three_attributes(cls):
     assert hasattr(err, "error_code")
     assert hasattr(err, "kind")
     assert hasattr(err, "errors")
+    assert hasattr(err, "message")
+    assert hasattr(err, "error_id")
     assert err.errors == []
 
 
@@ -162,3 +192,9 @@ def test_generic_up3_error_exposes_the_three_attributes():
     assert err.error_code == "UP3_UNKNOWN"
     assert err.kind == "validation"
     assert err.errors == []
+    assert err.message == "something new"
+
+
+def test_up3_error_message_prefers_top_level_envelope_message():
+    err = UP3Replay("constructor fallback", {"message": "server text", "error_code": "UP3_REPLAY"})
+    assert err.message == "server text"

@@ -2,23 +2,31 @@
 
 ## [0.1.26] — 2026-10-08
 
-### Explainable errors (B-32) — breaking response-shape change
+### Explainable errors (B-32) — new top-level fields; `detail` is a one-release shim
 
 - The server's error body is now ONE flat shape:
-  `{"error_code", "kind", "detail", "error_id", "errors"}`. **`detail` is
-  now always a string** — the old `{"detail": {"message", "error_code",
-  ...}}` nesting some consumers read via `response_data["detail"]["error_code"]`
-  is retired. Every extra field an error carries (`retry_after_seconds`,
-  `beneficiary_id`, `beneficiary_request_id`, `ceiling_minor`,
-  `consumed_minor`, `pending_minor`, `remaining_minor`, `currency`,
-  `lifts_on`, `cancel_reason`, ...) is now a top-level key too, never nested.
-  See `docs/ERRORS.md` in starmoney-bank-service for the full contract.
+  `{"error_code", "kind", "message", "error_id", "errors"}`, plus — **for
+  this release only** — a legacy `"detail": {"message", "error_code",
+  "errors"}` OBJECT mirroring those same fields, kept so a consumer still
+  reading `response_data["detail"]["error_code"]` / `["detail"]["errors"]`
+  (the pre-B-32 shape) does not break the moment the server deploys this.
+  **`detail` reverts to a plain string again in SDK 0.1.27** — do not build
+  new code against `detail.*`; read the top-level keys. Every extra field
+  an error carries (`retry_after_seconds`, `beneficiary_id`,
+  `beneficiary_request_id`, `ceiling_minor`, `consumed_minor`,
+  `pending_minor`, `remaining_minor`, `currency`, `lifts_on`,
+  `cancel_reason`, ...) is a top-level key only, never nested under
+  `detail`. See `docs/ERRORS.md` in starmoney-bank-service for the full
+  contract.
 - Every `APIError`/`UP3Error` (sub)class gains `.error_code` (`""` when the
   server didn't send one), `.kind` (`"validation"` | `"state"` |
   `"technical"`, defaulted by HTTP status when the server omits it),
-  `.errors` (a list, **never** `None` — `[]` when there is none) and
-  `.error_id`. Parsing accepts BOTH the new flat shape and the legacy nested
-  `detail` dict, so pinned-old-server consumers keep working during rollout.
+  `.errors` (a list, **never** `None` — `[]` when there is none), `.error_id`
+  and `.message` (the top-level `message`, falling back to the legacy
+  `detail.message`, falling back to the message the SDK derived itself —
+  e.g. from response text on a transport error). Parsing accepts BOTH the
+  new flat shape and the legacy nested `detail` dict, so pinned-old-server
+  consumers keep working during rollout.
 - `InvalidPhoneError.errors[0]["rule"]` is now `"phone.normalisation"` or
   `"phone.region"`; `InvalidIBANError.errors[0]["rule"]` is one of
   `"iban.format"` / `"iban.length"` / `"iban.country"` / `"iban.checksum"`.

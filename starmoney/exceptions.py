@@ -16,10 +16,14 @@ def _default_kind_for_status(status_code: int) -> str:
 
 
 def _parse_envelope(response_data: Optional[dict[str, Any]], status_code: int) -> dict[str, Any]:
-    """Parse the B-32 error envelope — flat (current server) or nested under
-    ``detail`` (legacy server) — into ``{error_code, kind, errors, error_id}``.
+    """Parse the B-32 error envelope into
+    ``{error_code, kind, errors, error_id, message}``.
 
-    Always returns ``errors`` as a list (never ``None``).
+    Top-level keys are read first; a ``detail`` dict (either the current
+    release's one-release legacy-compat object, or an old server's nested
+    shape) is the fallback for every field — so this parses the flat shape,
+    the transitional flat+``detail``-object shape, and the pre-B-32 nested
+    shape with the same code. ``errors`` is always a list (never ``None``).
     """
     data = response_data or {}
     nested = data.get("detail") if isinstance(data.get("detail"), dict) else {}
@@ -32,8 +36,15 @@ def _parse_envelope(response_data: Optional[dict[str, Any]], status_code: int) -
     if not isinstance(errors, list):
         errors = []
     error_id = data.get("error_id") or nested.get("error_id")
+    message = data.get("message") or nested.get("message")
 
-    return {"error_code": error_code, "kind": kind, "errors": errors, "error_id": error_id}
+    return {
+        "error_code": error_code,
+        "kind": kind,
+        "errors": errors,
+        "error_id": error_id,
+        "message": message,
+    }
 
 
 class StarmoneyError(Exception):
@@ -48,7 +59,10 @@ class APIError(StarmoneyError):
 
     Attributes:
         status_code: HTTP status code
-        message: Error message
+        message: Developer-facing English — the envelope's top-level
+            ``message`` when present, else its (deprecated, one-release)
+            ``detail.message``, else the ``message`` the caller/http_client
+            passed in (e.g. derived from response text on a transport error).
         response_data: Full response data from API
         error_code: Machine-readable code from the B-32 envelope ("" when
             the server didn't send one — e.g. a transport-level failure).
@@ -61,14 +75,14 @@ class APIError(StarmoneyError):
 
     def __init__(self, status_code: int, message: str, response_data: Optional[dict[str, Any]] = None):
         self.status_code = status_code
-        self.message = message
         self.response_data = response_data or {}
         envelope = _parse_envelope(self.response_data, status_code)
+        self.message: str = envelope["message"] or message
         self.error_code: str = envelope["error_code"]
         self.kind: str = envelope["kind"]
         self.errors: list[dict[str, Any]] = envelope["errors"]
         self.error_id: Optional[str] = envelope["error_id"]
-        super().__init__(f"[{status_code}] {message}")
+        super().__init__(f"[{status_code}] {self.message}")
 
 
 class AuthenticationError(APIError):
@@ -258,9 +272,9 @@ class UP3Error(StarmoneyError):
 
     def __init__(self, message: str = "", response_data: Optional[dict[str, Any]] = None) -> None:
         super().__init__(message)
-        self.message = message
         self.response_data = response_data or {}
         envelope = _parse_envelope(self.response_data, 422)
+        self.message: str = envelope["message"] or message
         self.error_code: str = envelope["error_code"] or self.code
         self.kind: str = envelope["kind"]
         self.errors: list[dict[str, Any]] = envelope["errors"]
