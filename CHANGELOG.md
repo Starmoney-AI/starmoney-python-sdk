@@ -1,6 +1,11 @@
 # Changelog
 
-## [0.1.26] — 2026-10-08
+## [0.2.1] — 2026-10-10
+
+> **Numbering:** from this release the SDK carries the same version as
+> `starmoney-bank-service` (`0.2.1`). This is the release that was announced
+> to consumers as "0.1.26"; no `v0.1.26` tag exists. Pin `v0.2.1`. The
+> follow-up previously called "0.1.27" is `0.2.2`.
 
 ### Explainable errors (B-32) — new top-level fields; `detail` is a one-release shim
 
@@ -10,7 +15,7 @@
   "errors"}` OBJECT mirroring those same fields, kept so a consumer still
   reading `response_data["detail"]["error_code"]` / `["detail"]["errors"]`
   (the pre-B-32 shape) does not break the moment the server deploys this.
-  **`detail` reverts to a plain string again in SDK 0.1.27** — do not build
+  **`detail` reverts to a plain string again in SDK 0.2.2** — do not build
   new code against `detail.*`; read the top-level keys. Every extra field
   an error carries (`retry_after_seconds`, `beneficiary_id`,
   `beneficiary_request_id`, `ceiling_minor`, `consumed_minor`,

@@ -1,5 +1,5 @@
 """Unit tests for the B-32 explainable-error attributes on SDK exceptions
-(sdk/python/starmoney/exceptions.py, 0.1.26).
+(sdk/python/starmoney/exceptions.py, 0.2.1).
 
 Every APIError/UP3Error (sub)class exposes `.error_code`, `.kind`, `.errors`
 (always a list, never None), `.error_id` and `.message`, parsed from either
