@@ -1,5 +1,23 @@
 # Changelog
 
+## [0.2.2] — 2026-10-20
+
+### `customer_reference` — StarMoney's reference for the customer to quote
+
+- New `customer_reference` (e.g. `SM-7KQ4X-9TDB2`) on every `payment.*`,
+  `deferred_transfer.*` and `payment.received` webhook, on
+  `accounts.get_transfer_history()` rows and on every `deferred_transfers`
+  response (send, get, cancel/claim, list). StarMoney mints it; the same
+  transfer always carries the same value, and a deferred transfer keeps one
+  reference from send to settle. Show it to the customer instead of your own
+  `client_transaction_id`.
+- `accounts.get_transfer_history()` rows and `deferred_transfers.list()`
+  rows also carry `client_transaction_id` (your own id, as sent).
+- Typed on `DeferredTransferSentPayload`, `PaymentReceivedPayload`,
+  `DeferredTransferSettledPayload`.
+- The `detail` → plain-string revert announced for 0.2.2 moves to **0.2.3**;
+  this release is additive only.
+
 ## [0.2.1] — 2026-10-10
 
 > **Numbering:** from this release the SDK carries the same version as

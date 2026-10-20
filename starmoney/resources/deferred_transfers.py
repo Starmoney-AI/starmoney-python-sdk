@@ -63,9 +63,9 @@ class DeferredTransfersResource:
 
         Returns:
             DeferredTransferResponse dict with keys:
-              id, client_transaction_id, sender_user_id, recipient_handle,
-              amount_minor, currency, branch, status, expires_at,
-              created_at, updated_at.
+              id, customer_reference, client_transaction_id, sender_user_id,
+              recipient_handle, amount_minor, currency, branch, status,
+              expires_at, created_at, updated_at.
 
         Raises:
             ValidationError (422): Invalid request (e.g. missing
@@ -119,7 +119,8 @@ class DeferredTransfersResource:
         Returns:
             Dict with keys:
               user_id, limit, offset, deferred_transfers (list). Each item has:
-              deferred_transfer_id, recipient_handle (MASKED, e.g. '+2217xxxxxx99'),
+              deferred_transfer_id, customer_reference, client_transaction_id,
+              recipient_handle (MASKED, e.g. '+2217xxxxxx99'),
               amount_minor, currency, status, created_at, expires_at.
 
         Raises:

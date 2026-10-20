@@ -136,6 +136,9 @@ class AccountsResource:
 
         Returns:
             Parsed JSON response with transfers, limit, offset and user_id
+            Each transfer carries transaction_id, client_transaction_id (your
+            own id, as sent) and customer_reference (StarMoney's reference for
+            the customer to see and quote, e.g. 'SM-7KQ4X-9TDB2').
         """
         params = {"limit": limit, "offset": offset}
         response = await self.http.get("/accounts/transfers", params=params, user_id=user_id)
