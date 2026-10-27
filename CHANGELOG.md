@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.2.3] — 2026-10-27
+
+### `customer_reference` on the payment responses
+
+- `payments.send()`, `payments.send_with_mandates()` and `payments.get_status()`
+  now return `customer_reference` (e.g. `SM-7KQ4X-9TDB2`), the same value as
+  the transfer's `payment.*` webhooks and its `get_transfer_history()` row, so
+  a confirmation screen can show it right after the send. A replayed mandated
+  send (`ALREADY_COMPLETED` / `ALREADY_IN_PROGRESS` / `ALREADY_FAILED`)
+  returns the original payment's reference.
+- The `detail` → plain-string revert moves past 0.2.3; this release is
+  additive only.
+
 ## [0.2.2] — 2026-10-20
 
 ### `customer_reference` — StarMoney's reference for the customer to quote

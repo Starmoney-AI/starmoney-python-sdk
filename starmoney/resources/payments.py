@@ -63,7 +63,8 @@ class PaymentsResource:
 
         Returns:
             CreatePaymentAPIResponse dict including transaction_id,
-            client_transaction_id, status, created_at, and optionally
+            client_transaction_id, customer_reference (since 0.2.3), status,
+            created_at, and optionally
             payment_mandate (revision-1 PaymentMandate signed by StarMoney).
 
         Raises:
@@ -124,7 +125,8 @@ class PaymentsResource:
         Returns:
             PaymentStatusAPIResponse dict with keys:
               client_transaction_id, status, last_updated, status_message,
-              trigger_event, starmoney_transaction_id.
+              trigger_event, starmoney_transaction_id, customer_reference
+              (since 0.2.3).
         """
         response = await self.http.get(f"/payments/status/{client_transaction_id}", user_id=user_id)
         return response.json()
@@ -221,6 +223,8 @@ class PaymentsResource:
             the revision-1 PaymentMandate signed by StarMoney when the mandate
             chain was valid. Since 0.1.23 the dict also carries intent_mandate
             and cart_mandate: the exact signed envelopes this call posted.
+            Since 0.2.3 it carries customer_reference, the reference to show
+            the customer (a replay returns the original payment's).
 
         Raises:
             RuntimeError: UP3 resource not configured with a secret.
