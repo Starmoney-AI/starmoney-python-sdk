@@ -2,6 +2,24 @@
 
 ## [Unreleased]
 
+## [0.3.1] — 2026-11-01
+
+### The settle of a deferred transfer is a payment (bank B-15 #133, PR-D2 #179)
+
+- Typed payloads for the settle payment's events and the closed transfer:
+  `PaymentInitiatedPayload`, `PaymentRailFailedPayload`, `PaymentBankStatusPayload`
+  (each with `sm_reference` first, the optional fee line, `funds` on a failure, and
+  `deferred_transfer_id` on a settle payment) and `DeferredTransferClosedPayload`
+  for the new `deferred_transfer.expired` / `deferred_transfer.cancelled`. The event
+  catalog lists both new types.
+- `deferred_transfer.settled` is no longer sent by the bank. A deferred transfer has
+  arrived when `payment.completed` carries its `deferred_transfer_id`.
+- A deferred transfer confirmed with a UP3 cart (0.3.0) now gets its PaymentMandate
+  revisions 1 and 2 under the settle payment (`<cart.id>:settle`); join them on
+  `payload.cart_mandate_id`.
+
+## [0.3.0] — 2026-11-01
+
 ### The bank's `detail` is a plain string again (bank PR-J) — no SDK change
 
 - The server retires the one-release `detail` object (0.2.1 → 0.3.0) and sends
@@ -44,8 +62,6 @@
   the window is missing on a deferred quote, ends before the cart does, or ends more
   than 7 days after the tap. `QUOTE_MISMATCH` / `QUOTE_CONSUMED` (with the hold's
   `sm_reference`) / `QUOTE_EXPIRED` as on payments; the UP3 codes when a cart signs.
-
-## [0.3.0] — 2026-10-31
 
 ### The transfer route from the SDK — preview, then confirm with a cart that signs the quote
 
