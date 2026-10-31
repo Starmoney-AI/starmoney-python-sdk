@@ -114,6 +114,58 @@ class PaymentsResource:
         response = await self.http.post("/payments", json=payload, user_id=user_id)
         return response.json()
 
+    async def quote(
+        self,
+        user_id: str,
+        *,
+        beneficiary_type: str,
+        beneficiary_value: str,
+        amount_minor: int,
+        currency: str = "XOF",
+    ) -> dict[str, Any]:
+        """
+        Preview one transfer before the PIN (transfer routes, PR-A):
+        ``POST /v1/payments/quotes``. Resolves the recipient, picks the
+        settlement rail, prices the fee and returns a quote the confirm
+        consumes once. Moves no money.
+
+        Args:
+            user_id: The sender.
+            beneficiary_type: ``"iban"`` (any IBAN), ``"msisdn"`` (phone, E.164
+                or local) or ``"beneficiary"`` (a saved beneficiary id).
+                ``"alias"`` is refused until W-124 ships.
+            beneficiary_value: The identifier as the customer named it.
+            amount_minor: Amount in minor units (XOF has none: 1 F = 1).
+            currency: ISO 4217, default XOF.
+
+        Returns:
+            PaymentQuoteResponse dict: ``quote {id, digest, digest_alg,
+            expires_at}``, ``outcome`` (credit | external), ``rail``
+            (bdk.internal | bdk.rtgs), ``rail_kind``, ``bank``, ``display_name``
+            + ``display_name_verified``, ``beneficiary {type, value}``,
+            ``amount_minor``, ``currency``, ``fees_minor {orchestrator, bank}``,
+            ``fee_total_minor``, ``total_debit_minor``, ``fee_collection``,
+            ``fee_grid_version``, ``send_remaining_minor``. The resolved IBAN is
+            never returned.
+
+        Raises (B-32 envelopes, see docs/ERRORS.md):
+            ValidationError 422 INVALID_IBAN / INVALID_PHONE /
+                SELF_TRANSFER_NOT_ALLOWED / BENEFICIARY_TYPE_UNSUPPORTED;
+            422 RECIPIENT_HAS_NO_ACCOUNT — the number has no creditable
+                account; the body carries ``recipient_status`` and
+                ``deferred_quote`` for ``POST /v1/deferred-transfers``;
+            404 BENEFICIARY_NOT_FOUND; 409 RECIPIENT_NOT_CREDITABLE /
+                BENEFICIARY_ACCOUNT_CLOSED; 429 IDENTIFIER_LOOKUP_LIMIT_REACHED
+                (``retry_after_seconds``); 403 PRE_KYC_*_CEILING_EXCEEDED.
+        """
+        payload: dict[str, Any] = {
+            "beneficiary": {"type": beneficiary_type, "value": beneficiary_value},
+            "amount_minor": int(amount_minor),
+            "currency": currency,
+        }
+        response = await self.http.post("/payments/quotes", json=payload, user_id=user_id)
+        return response.json()
+
     async def get_status(self, user_id: str, client_transaction_id: str) -> dict[str, Any]:
         """
         Get payment status by client transaction ID.
