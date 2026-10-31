@@ -252,8 +252,29 @@ async def test_cancel_calls_correct_path_with_user_id():
     http.post.assert_called_once_with(
         "/deferred-transfers/dt-uuid-1/cancel",
         user_id="user-1",
+        json={},
     )
     assert result["status"] == "cancelled"
+
+
+@pytest.mark.asyncio
+async def test_cancel_forwards_reason_in_the_body():
+    resource, http = _make_resource()
+    mock_resp = MagicMock()
+    mock_resp.json.return_value = {**_DT_RESPONSE, "status": "cancelled"}
+    http.post = AsyncMock(return_value=mock_resp)
+
+    await resource.cancel(
+        deferred_transfer_id="dt-uuid-1",
+        user_id="user-1",
+        reason="recipient_unreachable",
+    )
+
+    http.post.assert_called_once_with(
+        "/deferred-transfers/dt-uuid-1/cancel",
+        user_id="user-1",
+        json={"reason": "recipient_unreachable"},
+    )
 
 
 @pytest.mark.asyncio
@@ -275,3 +296,36 @@ async def test_send_forwards_client_reference():
         client_reference="bot_557712",
     )
     assert http.post.call_args.kwargs["json"]["client_reference"] == "bot_557712"
+
+
+@pytest.mark.asyncio
+async def test_send_threads_user_id_to_the_request_signer():
+    """0.1.22 (B-20 S4): the sender is the JWT sub; the SDK sets it, no raw HTTP."""
+    resource, http = _make_resource()
+    mock_resp = MagicMock()
+    mock_resp.json.return_value = _DT_RESPONSE
+    http.post = AsyncMock(return_value=mock_resp)
+    await resource.send(
+        client_transaction_id="ctid-1",
+        recipient_handle="+221770000001",
+        amount_minor=5000,
+        user_id="sender-user-id",
+    )
+    assert http.post.call_args.kwargs["user_id"] == "sender-user-id"
+
+
+@pytest.mark.asyncio
+async def test_list_by_client_transaction_id_is_forwarded_as_a_query_param():
+    """0.3.0 (B-71): find the transfer this flow sent under its own id."""
+    resource, http = _make_resource()
+    mock_resp = MagicMock()
+    mock_resp.json.return_value = _LIST_RESPONSE
+    http.get = AsyncMock(return_value=mock_resp)
+
+    await resource.list(user_id="user-1", client_transaction_id="dt-send-42")
+
+    http.get.assert_called_once_with(
+        "/deferred-transfers",
+        user_id="user-1",
+        params={"limit": 20, "offset": 0, "client_transaction_id": "dt-send-42"},
+    )

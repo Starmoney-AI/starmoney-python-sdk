@@ -3,6 +3,50 @@
 from typing import Any, Optional
 
 
+def _default_kind_for_status(status_code: int) -> str:
+    """Best-effort ``kind`` when the server's response doesn't carry one
+    (legacy body, or a status this SDK doesn't recognise) — see B-32."""
+    if status_code in (400, 422):
+        return "validation"
+    if status_code in (403, 404, 409, 429):
+        return "state"
+    if status_code >= 500:
+        return "technical"
+    return "validation"
+
+
+def _parse_envelope(response_data: Optional[dict[str, Any]], status_code: int) -> dict[str, Any]:
+    """Parse the B-32 error envelope into
+    ``{error_code, kind, errors, error_id, message}``.
+
+    Top-level keys are read first; a ``detail`` dict (either the current
+    release's one-release legacy-compat object, or an old server's nested
+    shape) is the fallback for every field — so this parses the flat shape,
+    the transitional flat+``detail``-object shape, and the pre-B-32 nested
+    shape with the same code. ``errors`` is always a list (never ``None``).
+    """
+    data = response_data or {}
+    nested = data.get("detail") if isinstance(data.get("detail"), dict) else {}
+
+    error_code = data.get("error_code") or nested.get("error_code") or ""
+    kind = data.get("kind") or nested.get("kind") or _default_kind_for_status(status_code)
+    errors = data.get("errors")
+    if errors is None:
+        errors = nested.get("errors")
+    if not isinstance(errors, list):
+        errors = []
+    error_id = data.get("error_id") or nested.get("error_id")
+    message = data.get("message") or nested.get("message")
+
+    return {
+        "error_code": error_code,
+        "kind": kind,
+        "errors": errors,
+        "error_id": error_id,
+        "message": message,
+    }
+
+
 class StarmoneyError(Exception):
     """Base exception for all StarMoney SDK errors."""
 
@@ -15,17 +59,30 @@ class APIError(StarmoneyError):
 
     Attributes:
         status_code: HTTP status code
-        message: Error message
+        message: Developer-facing English — the envelope's top-level
+            ``message`` when present, else its (deprecated, one-release)
+            ``detail.message``, else the ``message`` the caller/http_client
+            passed in (e.g. derived from response text on a transport error).
         response_data: Full response data from API
+        error_code: Machine-readable code from the B-32 envelope ("" when
+            the server didn't send one — e.g. a transport-level failure).
+        kind: One of "validation" | "state" | "technical" (B-32). Parsed from
+            the envelope when present, else a best-effort default by status.
+        errors: Field-level detail list from the envelope. Never ``None`` —
+            ``[]`` when there is none.
+        error_id: The server's correlation id for this error, when present.
     """
 
-    def __init__(
-        self, status_code: int, message: str, response_data: Optional[dict[str, Any]] = None
-    ):
+    def __init__(self, status_code: int, message: str, response_data: Optional[dict[str, Any]] = None):
         self.status_code = status_code
-        self.message = message
         self.response_data = response_data or {}
-        super().__init__(f"[{status_code}] {message}")
+        envelope = _parse_envelope(self.response_data, status_code)
+        self.message: str = envelope["message"] or message
+        self.error_code: str = envelope["error_code"]
+        self.kind: str = envelope["kind"]
+        self.errors: list[dict[str, Any]] = envelope["errors"]
+        self.error_id: Optional[str] = envelope["error_id"]
+        super().__init__(f"[{status_code}] {self.message}")
 
 
 class AuthenticationError(APIError):
@@ -52,6 +109,18 @@ class DuplicateResourceError(APIError):
     For beneficiaries the server returns ``error_code == "DUPLICATE_BENEFICIARY"``
     alongside the 409.
     """
+
+    @property
+    def existing_id(self) -> Optional[str]:
+        """Id of the row that already exists, when the server names it:
+        ``beneficiary_id`` (an active beneficiary with that IBAN) or
+        ``beneficiary_request_id`` (a pending request for that number)."""
+        d = self.response_data or {}
+        legacy = d.get("detail") if isinstance(d.get("detail"), dict) else {}
+        detail = {**legacy, **{k: v for k, v in d.items() if k != "detail"}}
+        if not isinstance(detail, dict):
+            return None
+        return detail.get("beneficiary_id") or detail.get("beneficiary_request_id")
 
     pass
 
@@ -109,6 +178,34 @@ class PreKycTotalCeilingExceededError(APIError):
         return self.response_data.get("remaining_minor")
 
 
+class SelfTransferNotAllowedError(APIError):
+    """422 ``SELF_TRANSFER_NOT_ALLOWED`` — the number, handle or vIBAN is the
+    caller's own (B-27 contract §1/§5). Raised by ``beneficiaries.create``,
+    ``payments.*`` and ``deferred_transfers.send``. Exception on the server:
+    the customer's own linked bank account, by IBAN."""
+
+
+class InvalidPhoneError(APIError):
+    """422 ``INVALID_PHONE`` — the phone number failed normalisation
+    (libphonenumber). ``response_data["detail"]["errors"]`` names the field."""
+
+
+class BeneficiaryAddLimitReachedError(APIError):
+    """429 ``BENEFICIARY_ADD_LIMIT_REACHED`` — more than 20 phone/handle adds
+    in the rolling 24 h (201 and 202 both count). ``retry_after_seconds`` says
+    when the oldest add leaves the window."""
+
+    @property
+    def retry_after_seconds(self) -> Optional[int]:
+        d = self.response_data or {}
+        legacy = d.get("detail") if isinstance(d.get("detail"), dict) else {}
+        detail = {**legacy, **{k: v for k, v in d.items() if k != "detail"}}
+        if not isinstance(detail, dict):
+            return None
+        value = detail.get("retry_after_seconds")
+        return int(value) if value is not None else None
+
+
 class RateLimitError(APIError):
     """429 - Too many requests."""
 
@@ -162,14 +259,28 @@ class InvalidSignatureError(StarmoneyError):
 
 
 class UP3Error(StarmoneyError):
-    """Base class for all UP3 protocol errors surfaced by the SDK."""
+    """Base class for all UP3 protocol errors surfaced by the SDK.
+
+    Carries the same B-32 attributes as ``APIError`` (``error_code``,
+    ``kind``, ``errors``, ``error_id``) so callers can branch on them
+    uniformly regardless of whether the server refused with a UP3_* code or
+    any other domain error. ``error_code`` defaults to ``self.code`` (the
+    UP3-specific identifier, e.g. ``"UP3_SIG_INVALID"``) when the response
+    doesn't carry its own — which is the common case, since the server's
+    UP3Error.error_code IS ``exc.code``.
+    """
 
     code: str = "UP3_UNKNOWN"
 
     def __init__(self, message: str = "", response_data: Optional[dict[str, Any]] = None) -> None:
         super().__init__(message)
-        self.message = message
         self.response_data = response_data or {}
+        envelope = _parse_envelope(self.response_data, 422)
+        self.message: str = envelope["message"] or message
+        self.error_code: str = envelope["error_code"] or self.code
+        self.kind: str = envelope["kind"]
+        self.errors: list[dict[str, Any]] = envelope["errors"]
+        self.error_id: Optional[str] = envelope["error_id"]
 
     def __str__(self) -> str:
         return f"{self.code}: {self.message}" if self.message else self.code
@@ -259,8 +370,45 @@ class UP3RevisionRegression(UP3Error):
     code = "UP3_REVISION_REGRESSION"
 
 
+class UP3MandateRequired(UP3Error):
+    """UP3_MANDATE_REQUIRED — the verifier's policy flags your issuer as
+    mandate-required and this payment carried no Intent + Cart chain (HTTP 409).
+
+    A refusal: nothing was sent, nothing was written. It is NOT a duplicate.
+    (0.2-draft staging profile P9.)
+    """
+
+    code = "UP3_MANDATE_REQUIRED"
+
+
+class UP3PayerMismatch(UP3Error):
+    """UP3_PAYER_MISMATCH — cart.user_ref does not resolve to the authenticated
+    payer (HTTP 409). A refusal, nothing written. (Profile P2.)"""
+
+    code = "UP3_PAYER_MISMATCH"
+
+
+class UP3IssuerMismatch(UP3Error):
+    """UP3_ISSUER_MISMATCH — cart.issuer is not the authenticated caller
+    (HTTP 409). A refusal, nothing written. (Profile P3.)"""
+
+    code = "UP3_ISSUER_MISMATCH"
+
+
+class UP3TypeRequiredMissing(UP3Error):
+    """UP3_TYPE_REQUIRED_MISSING — the verifier requires a consent-evidence type
+    for your issuer and the cart carries a different, merely accepted, one
+    (HTTP 422). (Profile P10.)"""
+
+    code = "UP3_TYPE_REQUIRED_MISSING"
+
+
 # Map error code strings -> exception classes for http_client error handling.
 UP3_ERROR_CODE_MAP: dict[str, type[UP3Error]] = {
+    "UP3_MANDATE_REQUIRED": UP3MandateRequired,
+    "UP3_PAYER_MISMATCH": UP3PayerMismatch,
+    "UP3_ISSUER_MISMATCH": UP3IssuerMismatch,
+    "UP3_TYPE_REQUIRED_MISSING": UP3TypeRequiredMissing,
     "UP3_SIG_INVALID": UP3SignatureInvalid,
     "UP3_KEY_NOT_REGISTERED": UP3KeyNotRegistered,
     "UP3_CHAIN_BROKEN": UP3ChainBroken,

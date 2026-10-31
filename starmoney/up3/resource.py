@@ -22,7 +22,6 @@ from __future__ import annotations
 
 import base64
 import hashlib
-import re
 import time
 from datetime import datetime, timedelta, timezone
 from typing import Any, Optional
@@ -41,7 +40,6 @@ def _generate_ulid() -> str:
     Not a strict ULID library dependency — keeps the SDK dep-free for this.
     """
     import os
-    import struct
 
     ts_ms = int(time.time() * 1000)
     # Encode 48-bit timestamp into 10 chars
@@ -102,6 +100,20 @@ def _derive_cart_id(issuer: str, seed: str) -> str:
     return f"mnd_{b32[:26].upper()}"
 
 
+# "argument not passed" sentinel for build_cart_v02.beneficiary_name, whose
+# meaningful default (the quote's display_name) may itself be None.
+_UNSET: Any = object()
+
+
+def _to_z(value: str) -> str:
+    """Normalise an RFC 3339 timestamp to the envelope's second-precision UTC Z
+    form (the bank returns ``expires_at`` with microseconds and ``+00:00``)."""
+    dt = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    return dt.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
 def _now_z() -> str:
     """Current UTC time in RFC 3339 with mandatory Z suffix."""
     return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
@@ -120,8 +132,16 @@ class UP3Resource:
 
     Methods:
         build_intent(...)   — Build and sign an IntentMandate dict.
-        build_cart(...)     — Build and sign a CartMandate dict.
-        verify_payment_mandate(envelope) -> bool — Verify a PaymentMandate.
+        build_cart(...)     — Build and sign a 0.1 CartMandate dict (IBAN by value).
+        build_cart_v02(...) — Build and sign a 0.2 CartMandate that signs a quote
+                              from ``client.payments.quote(...)`` (transfer routes).
+        build_deferred_cart_v02(...) — Build and sign a 0.2 CartMandate that consents
+                              to a deferred transfer (the hold from a
+                              ``RECIPIENT_HAS_NO_ACCOUNT`` refusal's deferred_quote).
+        cart_id_for(seed)   — The cart.id a seed derives to (retry / status lookup).
+        verify_payment_mandate(envelope, orchestrator_secret=...) -> bool —
+            Verify a PaymentMandate with the ORCHESTRATOR's key (not the
+            client's own secret; see the method's note).
     """
 
     def __init__(self, secret: bytes, issuer: str) -> None:
@@ -267,11 +287,7 @@ class UP3Resource:
         intent_id = intent_mandate["id"]
         intent_payload = intent_mandate["payload"]
 
-        mandate_id = (
-            _derive_cart_id(self._issuer, idempotency_seed)
-            if idempotency_seed is not None
-            else _mandate_id()
-        )
+        mandate_id = _derive_cart_id(self._issuer, idempotency_seed) if idempotency_seed is not None else _mandate_id()
         now = _now_z()
         expires = _future_z(ttl_minutes)
 
@@ -302,22 +318,281 @@ class UP3Resource:
         envelope["signature"] = sign(envelope, secret=self._secret)
         return envelope
 
-    def verify_payment_mandate(self, envelope: dict[str, Any]) -> bool:
-        """Verify the StarMoney signature on a PaymentMandate envelope.
+    def build_cart_v02(
+        self,
+        intent_mandate: dict[str, Any],
+        *,
+        quote: dict[str, Any],
+        beneficiary_name: Optional[str] = _UNSET,  # type: ignore[assignment]
+        confirmed_at: Optional[str] = None,
+        consent_evidence: Optional[dict[str, Any]] = None,
+        ttl_minutes: int = 2,
+        idempotency_seed: Optional[str] = None,
+    ) -> dict[str, Any]:
+        """Build and sign a **0.2** CartMandate that signs a quote (transfer routes, 0.3.0).
 
-        Uses the same secret (v0.1 per-service shared key) to verify.
-        Returns True on a valid signature, False otherwise.
+        UP3 0.2-draft P17: the cart no longer carries the recipient's IBAN by
+        value nor a rail. It carries the identifier **as the customer saw it**
+        (``beneficiary {type, value}``), the display name the preview showed,
+        the quote's ``{id, digest, digest_alg}`` and its fee legs — everything
+        copied from the ``POST /v1/payments/quotes`` answer, so the bank can
+        bind the cart to the quote it stored (digest compared, never
+        recomputed) and refuse any drift (``UP3_QUOTE_DRIFT`` /
+        ``UP3_FEE_DRIFT``). No ``quote_id`` travels in the request body: the
+        cart **is** the quote.
+
+        P12: a cart may not outlive its quote. ``expires_at`` is the earlier of
+        ``now + ttl_minutes`` and ``quote.expires_at``; a cart built from an
+        already-expired quote is refused by the bank as ``UP3_EXPIRED`` —
+        preview again.
+
+        Args:
+            intent_mandate: The signed IntentMandate from :meth:`build_intent`
+                (``max_amount_minor`` must cover ``quote["amount_minor"]``).
+            quote: The **whole** ``client.payments.quote(...)`` response dict
+                (``PaymentQuoteResponse``): ``quote {id, digest, digest_alg,
+                expires_at}``, ``beneficiary {type, value}``, ``display_name``,
+                ``amount_minor``, ``currency``, ``fees_minor``. A quote whose
+                ``outcome`` is ``deferred`` cannot be confirmed here (the hold
+                goes through ``deferred_transfers.send``).
+            beneficiary_name: The name the customer saw. Defaults to the
+                quote's ``display_name`` (which may be ``None``); pass a value
+                only to shorten it the way your screen did.
+            confirmed_at: RFC 3339 Z timestamp of the user's tap. Defaults to now.
+            consent_evidence: ``user_consent_evidence``; defaults to
+                ``{"type": "service_attestation", "data": {}}``.
+            ttl_minutes: Cart lifetime (default 2), clamped to the quote's.
+            idempotency_seed: Same contract as :meth:`build_cart` — the SAME
+                seed on a transport retry of the SAME authorization derives
+                the same ``cart.id`` and the bank answers the stored outcome.
+
+        Returns:
+            Signed ``version: "0.2"`` CartMandate envelope, ready to POST as
+            ``cart_mandate`` with no instruction fields in the body.
+
+        Raises:
+            ValueError: the quote dict lacks the keys a 0.2 cart signs, or is
+                a ``deferred`` quote.
+        """
+        try:
+            ref = quote["quote"]
+            quote_id, digest, digest_alg = ref["id"], ref["digest"], ref["digest_alg"]
+            beneficiary = quote["beneficiary"]
+            amount_minor = int(quote["amount_minor"])
+            currency = quote["currency"]
+            fees_minor = dict(quote["fees_minor"])
+        except (KeyError, TypeError) as exc:
+            raise ValueError(
+                "build_cart_v02 needs the whole POST /v1/payments/quotes response "
+                "(quote {id, digest, digest_alg}, beneficiary {type, value}, amount_minor, "
+                f"currency, fees_minor); missing {exc!r}"
+            ) from exc
+        if quote.get("outcome") == "deferred":
+            raise ValueError(
+                "a deferred quote (recipient has no account yet) is confirmed with "
+                "deferred_transfers.send, not a 0.2 cart"
+            )
+        if beneficiary_name is _UNSET:
+            beneficiary_name = quote.get("display_name")
+        if confirmed_at is None:
+            confirmed_at = _now_z()
+        if consent_evidence is None:
+            consent_evidence = {"type": "service_attestation", "data": {}}
+
+        intent_id = intent_mandate["id"]
+        intent_payload = intent_mandate["payload"]
+        mandate_id = _derive_cart_id(self._issuer, idempotency_seed) if idempotency_seed is not None else _mandate_id()
+        now = _now_z()
+        expires = _future_z(ttl_minutes)
+        quote_expires = ref.get("expires_at")
+        if isinstance(quote_expires, str) and quote_expires:
+            expires = min(expires, _to_z(quote_expires))  # P12: never past the quote
+
+        payload: dict[str, Any] = {
+            "intent_mandate_id": intent_id,
+            "user_ref": intent_payload["user_ref"],
+            "amount_minor": amount_minor,
+            "currency": currency,
+            "beneficiary": {"type": beneficiary["type"], "value": beneficiary["value"]},
+            "beneficiary_name": beneficiary_name,
+            "quote": {"id": quote_id, "digest": digest, "digest_alg": digest_alg},
+            "fees_minor": fees_minor,
+            "confirmed_at": confirmed_at,
+            "user_consent_evidence": consent_evidence,
+        }
+        envelope: dict[str, Any] = {
+            "version": "0.2",
+            "type": "cart",
+            "id": mandate_id,
+            "issued_at": now,
+            "expires_at": expires,
+            "issuer": self._issuer,
+            "payload": payload,
+        }
+        envelope["signature"] = sign(envelope, secret=self._secret)
+        return envelope
+
+    def build_deferred_cart_v02(
+        self,
+        intent_mandate: dict[str, Any],
+        *,
+        refusal: dict[str, Any],
+        beneficiary_value: str,
+        amount_minor: int,
+        currency: str = "XOF",
+        execute_before: Optional[str] = None,
+        hold_days: int = 7,
+        confirmed_at: Optional[str] = None,
+        consent_evidence: Optional[dict[str, Any]] = None,
+        ttl_minutes: int = 2,
+        idempotency_seed: Optional[str] = None,
+    ) -> dict[str, Any]:
+        """Build and sign a **0.2** CartMandate that consents to a DEFERRED
+        transfer — the hold from the quote (bank PR-D, B-67).
+
+        When ``payments.quote(...)`` answers **422 ``RECIPIENT_HAS_NO_ACCOUNT``**
+        for a phone nobody holds yet, the refusal carries ``deferred_quote``:
+        the quote of the hold the sender may place instead (``bdk.internal``,
+        no fee — the money moves inside BDK when the recipient opens their
+        account). This cart signs that quote, the phone **as the customer
+        typed it**, the amount, and an **execution window**
+        (``execute_before``, UP3 0.2-draft R1–R4): the latest moment the bank
+        may still execute the consented transfer — the hold runs until then
+        (at most the bank's 7-day ceiling) and lapses unclaimed after it.
+
+        Args:
+            intent_mandate: The signed IntentMandate from :meth:`build_intent`
+                (``max_amount_minor`` must cover ``amount_minor``).
+            refusal: The whole 422 body (``error_code`` =
+                ``RECIPIENT_HAS_NO_ACCOUNT`` with ``deferred_quote``) **or** its
+                ``deferred_quote`` dict (``id``, ``digest``, ``digest_alg``,
+                ``expires_at``, ``fees_minor``). A refusal without a deferred
+                quote (the recipient is mid-onboarding) cannot be consented.
+            beneficiary_value: The phone the customer typed (E.164) — the
+                deferred quote names no payee; the bank compares it with the
+                phone it quoted.
+            amount_minor: The amount quoted (the refusal does not repeat it).
+            currency: ``XOF``.
+            execute_before: RFC 3339 Z timestamp — the end of the execution
+                window. Defaults to ``confirmed_at + hold_days`` days.
+            hold_days: Default window length when ``execute_before`` is not
+                given (1–7; the bank caps the hold at 7 days).
+            confirmed_at: RFC 3339 Z timestamp of the user's tap. Defaults to now.
+            consent_evidence: ``user_consent_evidence``; defaults to
+                ``{"type": "service_attestation", "data": {}}``.
+            ttl_minutes: Cart lifetime (default 2), clamped to the quote's (P12).
+            idempotency_seed: Same contract as :meth:`build_cart`: the SAME seed
+                on a retry derives the same ``cart.id``, which is the
+                ``client_transaction_id`` of the hold — the bank answers the
+                stored deferred transfer.
+
+        Returns:
+            Signed ``version: "0.2"`` CartMandate envelope with
+            ``payload.execute_before``, ready to POST as ``cart_mandate`` on
+            ``POST /v1/deferred-transfers/send`` with no instruction fields.
+
+        Raises:
+            ValueError: no deferred quote in the refusal, a non-E.164 phone, a
+                non-positive amount, or ``hold_days`` outside 1–7.
+        """
+        dq = refusal.get("deferred_quote") if "deferred_quote" in refusal else refusal
+        if not isinstance(dq, dict) or "digest" not in dq:
+            raise ValueError(
+                "build_deferred_cart_v02 needs the RECIPIENT_HAS_NO_ACCOUNT refusal that carries "
+                "deferred_quote {id, digest, digest_alg, expires_at, fees_minor} — a refusal "
+                "without one (recipient mid-onboarding) cannot be consented; ask again later"
+            )
+        try:
+            quote_id, digest, digest_alg = dq["id"], dq["digest"], dq["digest_alg"]
+            fees_minor = dict(dq["fees_minor"])
+        except (KeyError, TypeError) as exc:
+            raise ValueError(f"deferred_quote lacks {exc!r}") from exc
+        if not isinstance(beneficiary_value, str) or not beneficiary_value.startswith("+"):
+            raise ValueError("beneficiary_value must be the recipient's phone in E.164 form (+221…)")
+        amount_minor = int(amount_minor)
+        if amount_minor <= 0:
+            raise ValueError("amount_minor must be > 0")
+        if not 1 <= int(hold_days) <= 7:
+            raise ValueError("hold_days must be between 1 and 7 (the bank caps the hold at 7 days)")
+        if confirmed_at is None:
+            confirmed_at = _now_z()
+        if execute_before is None:
+            anchor = datetime.strptime(confirmed_at, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=timezone.utc)
+            execute_before = (anchor + timedelta(days=int(hold_days))).strftime("%Y-%m-%dT%H:%M:%SZ")
+        else:
+            execute_before = _to_z(execute_before)
+        if consent_evidence is None:
+            consent_evidence = {"type": "service_attestation", "data": {}}
+
+        intent_id = intent_mandate["id"]
+        intent_payload = intent_mandate["payload"]
+        mandate_id = _derive_cart_id(self._issuer, idempotency_seed) if idempotency_seed is not None else _mandate_id()
+        now = _now_z()
+        expires = _future_z(ttl_minutes)
+        quote_expires = dq.get("expires_at")
+        if isinstance(quote_expires, str) and quote_expires:
+            expires = min(expires, _to_z(quote_expires))  # P12: never past the quote
+
+        payload: dict[str, Any] = {
+            "intent_mandate_id": intent_id,
+            "user_ref": intent_payload["user_ref"],
+            "amount_minor": amount_minor,
+            "currency": currency,
+            "beneficiary": {"type": "msisdn", "value": beneficiary_value},
+            "beneficiary_name": None,  # nobody holds the number yet: no name was shown
+            "quote": {"id": quote_id, "digest": digest, "digest_alg": digest_alg},
+            "fees_minor": fees_minor,
+            "execute_before": execute_before,
+            "confirmed_at": confirmed_at,
+            "user_consent_evidence": consent_evidence,
+        }
+        envelope: dict[str, Any] = {
+            "version": "0.2",
+            "type": "cart",
+            "id": mandate_id,
+            "issued_at": now,
+            "expires_at": expires,
+            "issuer": self._issuer,
+            "payload": payload,
+        }
+        envelope["signature"] = sign(envelope, secret=self._secret)
+        return envelope
+
+    def cart_id_for(self, idempotency_seed: str) -> str:
+        """The cart.id that ``build_cart(..., idempotency_seed=seed)`` derives.
+
+        Same derivation as the build (``_derive_cart_id``), for callers that
+        need the id without rebuilding the cart: a status lookup after a
+        timeout, a log line before the send.
+
+        Raises:
+            ValueError: seed is empty or whitespace-only.
+        """
+        return _derive_cart_id(self._issuer, idempotency_seed)
+
+    def verify_payment_mandate(self, envelope: dict[str, Any], *, orchestrator_secret: Optional[bytes] = None) -> bool:
+        """Verify the Orchestrator's signature on a PaymentMandate envelope.
+
+        A PaymentMandate is signed by the ORCHESTRATOR (StarMoney) with its own
+        key, not by this client. Pass that key as ``orchestrator_secret`` to
+        verify. Without it the check runs against this client's own secret,
+        which is NOT the signing key in production and will return False; that
+        default exists only for sandboxes where both sides share one secret.
+        Note that any party holding an HMAC key that verifies can also forge;
+        real third-party verification arrives with asymmetric PaymentMandate
+        signatures (UP3 0.2-draft).
 
         The SDK does NOT raise on invalid signature by default — callers decide
         how to surface UP3_SIG_INVALID (log for audit, surface to user, etc.).
 
         Args:
             envelope: The full PaymentMandate dict including 'signature'.
+            orchestrator_secret: The Orchestrator's HMAC key, if you hold it.
 
         Returns:
             True if signature is valid, False otherwise.
         """
-        return verify(envelope, secret=self._secret)
+        return verify(envelope, secret=orchestrator_secret or self._secret)
 
     def verify_payment_mandate_strict(self, envelope: dict[str, Any]) -> bool:
         """Like verify_payment_mandate but raises UP3SignatureInvalid on failure.
@@ -334,7 +609,5 @@ class UP3Resource:
         result = verify(envelope, secret=self._secret)
         if not result:
             issuer = envelope.get("issuer", "unknown")
-            raise UP3SignatureInvalid(
-                f"PaymentMandate signature did not verify for issuer={issuer!r}"
-            )
+            raise UP3SignatureInvalid(f"PaymentMandate signature did not verify for issuer={issuer!r}")
         return True

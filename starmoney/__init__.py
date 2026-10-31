@@ -77,6 +77,10 @@ from .exceptions import (
     UP3KeyNotRegistered,
     UP3RailDrift,
     UP3Replay,
+    UP3MandateRequired,
+    UP3PayerMismatch,
+    UP3IssuerMismatch,
+    UP3TypeRequiredMissing,
     UP3RevisionFieldDrift,
     UP3RevisionRegression,
     UP3SchemaInvalid,
@@ -86,6 +90,8 @@ from .exceptions import (
 )
 from .webhooks.events import WebhookEvent
 from .webhooks.payloads import (
+    FeeLine,
+    FundsOutcome,
     AccountKycReviewRequiredPayload,
     AccountKycVerifiedPayload,
     AccountLifecyclePayload,
@@ -134,6 +140,8 @@ __all__ = [
     "AccountOpenedPayload",
     "AccountKycVerifiedPayload",
     "AccountKycReviewRequiredPayload",
+    "FeeLine",
+    "FundsOutcome",
     # Base exceptions
     "StarmoneyError",
     "APIError",
@@ -159,6 +167,10 @@ __all__ = [
     "UP3KeyNotRegistered",
     "UP3RailDrift",
     "UP3Replay",
+    "UP3MandateRequired",
+    "UP3PayerMismatch",
+    "UP3IssuerMismatch",
+    "UP3TypeRequiredMissing",
     "UP3RevisionFieldDrift",
     "UP3RevisionRegression",
     "UP3SchemaInvalid",

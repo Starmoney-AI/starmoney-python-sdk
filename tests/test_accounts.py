@@ -274,3 +274,36 @@ def test_version_matches_distribution_metadata():
     assert starmoney.__version__ != "0.0.0+source", (
         "package appears uninstalled in the test env; cannot validate version"
     )
+
+
+# ---------------------------------------------------------------------------
+# resolve_self — the caller's own references (PR-G)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_resolve_self_calls_the_user_scoped_path():
+    resource, http = _make_resource()
+    mock_resp = MagicMock()
+    mock_resp.json.return_value = {
+        "user_id": "user-1",
+        "display_name": "Awa",
+        "account_state": "active_pre_kyc",
+        "accounts": [
+            {
+                "account_reference": "SN12K0010015200002569000754",
+                "viban_tenant_slug": "sandbox",
+                "currency": "XOF",
+                "provisioning_state": "active",
+                "payable": True,
+                "opened_at": "2026-10-31T15:00:00+00:00",
+            }
+        ],
+    }
+    http.get = AsyncMock(return_value=mock_resp)
+
+    result = await resource.resolve_self("user-1")
+
+    http.get.assert_called_once_with("/accounts/resolve-self", user_id="user-1")
+    assert result["accounts"][0]["account_reference"].startswith("SN12")
+    assert result["display_name"] == "Awa"

@@ -70,6 +70,9 @@ _EXPECTED_BROADCASTABLE_EVENTS = {
     "account.kyc.review_required",
     # Inbound credit
     "payment.received",
+    # Beneficiaries by phone (B-27)
+    "beneficiary.added",
+    "beneficiary_request.expired",
 }
 
 

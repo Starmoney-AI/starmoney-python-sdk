@@ -14,6 +14,7 @@ class AccountsResource:
     - Opening StarMoney accounts (home vIBAN provisioned inline by `create`)
     - Linking OTHER payment rails to accounts (`link_rail`)
     - Account-status enquiry (`get_status`)
+    - The caller's own references (`resolve_self`, PR-G) — prefer it to the phone lookup
     - KYC attestation submission
     - Profile management
     """
@@ -136,9 +137,44 @@ class AccountsResource:
 
         Returns:
             Parsed JSON response with transfers, limit, offset and user_id
+            Each transfer carries transaction_id, client_transaction_id (your
+            own id, as sent) and customer_reference (StarMoney's reference for
+            the customer to see and quote, e.g. 'SM-7KQ4X-9TDB2').
         """
         params = {"limit": limit, "offset": offset}
         response = await self.http.get("/accounts/transfers", params=params, user_id=user_id)
+        return response.json()
+
+    async def resolve_self(self, user_id: str) -> Dict[str, Any]:
+        """
+        The authenticated holder's OWN account references (GET /accounts/resolve-self).
+
+        Use this instead of ``get_user_by_phone`` for "show me my account": the
+        bank resolves the holder from the JWT subject, the request names nobody,
+        so no other customer can be reached. Each call is audit-logged by the
+        bank and capped per holder (RESOLVE_SELF_LIMIT_PER_24H, default 20 in
+        the rolling 24 h → ``RESOLVE_SELF_LIMIT_REACHED`` 429 with
+        ``retry_after_seconds``).
+
+        Args:
+            user_id: The authenticated user's ID (mints the user-scoped JWT).
+
+        Returns:
+            dict with keys:
+              - user_id
+              - display_name: the holder's first name, or None
+              - account_state: 'captured' | 'active_pre_kyc' | 'kyc_pending'
+                | 'verified' | 'closed' | None (parse with ``starmoney.AccountState``)
+              - accounts: list of {account_reference, viban_tenant_slug,
+                currency, provisioning_state, payable, opened_at} — the
+                holder's vIBANs, oldest first; [] before provisioning.
+
+        Raises:
+            NotFoundError (404): no such holder.
+            AuthenticationError (401): user_id missing or JWT invalid.
+            RateLimitError (429): RESOLVE_SELF_LIMIT_REACHED.
+        """
+        response = await self.http.get("/accounts/resolve-self", user_id=user_id)
         return response.json()
 
     async def get_user_by_phone(self, phone_number: str) -> Dict[str, Any] | None:

@@ -1,30 +1,218 @@
 # Changelog
 
-## [0.1.22] — 2026-09-28
+## [Unreleased]
 
-### Deferred transfers settle as ordinary payments through BDK — contract change
+### The bank's `detail` is a plain string again (bank PR-J) — no SDK change
 
-- Once claimed, a deferred transfer's money moves as an **ordinary payment**
-  through BDK (never an internal settle). Its outcome is reported through the
-  standard `payment.initiated` / `payment.completed` / `payment.failed` events,
-  which now carry **`deferred_transfer_id`** on these settle payments. `user_id`
-  and `client_reference` are the original sender's.
-- `deferred_transfer.settled` is **deprecated**: no longer emitted.
-- New status `settling` (the settle payment is in flight): claim responses return
-  `settling` where they returned `settled`. `starmoney.DeferredTransferStatus`
-  lists the closed set.
-- New events `deferred_transfer.expired` (`reason_code` ∈ {`not_claimed`,
-  `recipient_kyc_incomplete`}) and `deferred_transfer.cancelled`
-  (`cancelled_by_sender`): the transfer closed unpaid, the hold was released, the
-  money is back with the sender. Typed as `DeferredTransferClosedPayload`
-  (aliases `DeferredTransferExpiredPayload` / `DeferredTransferCancelledPayload`).
-- New typed payloads for payment events: `PaymentInitiatedPayload`,
-  `PaymentRailFailedPayload` (`payment.failed` raised by StarMoney at or before the
-  rail — has `error`) and `PaymentBankStatusPayload` (`payment.accepted` /
-  `payment.completed` / `payment.failed` from BDK's status callback). All carry the
-  optional `deferred_transfer_id`.
-- The recipient's credit arrives as their own `payment.received` (sender_name
-  filled for in-network transfers).
+- The server retires the one-release `detail` object (0.2.1 → 0.3.0) and sends
+  `detail` as the `message` string. The SDK has read the top-level keys
+  (`error_code`, `kind`, `message`, `errors`, extras) since 0.2.1 and already
+  treats a string `detail` as the message, so every exception class maps as
+  before. A consumer that bypasses the SDK and indexes `response_data["detail"][...]`
+  must read the top-level key of the same name instead.
+
+### History rows carry the fee line (bank PR-I)
+
+- `accounts.get_transfer_history(user_id)` rows now carry the fee line (`quote_id`,
+  `settlement_rail`, `fees_minor`, `fee_total_minor`, `total_debit_minor`,
+  `fee_grid_version`; `None` on a row that confirmed no quote) beside `sm_reference` —
+  the same `FeeLine` keys as the send / status responses. No SDK code change; the rows
+  are returned as the bank sends them.
+
+### The hold from the quote — a deferred transfer confirmed with a UP3 cart (bank PR-D, B-67)
+
+- `deferred_transfers.send_with_mandates(user_id, user_ref=…, refusal=<the 422 body>,
+  beneficiary_value=<the phone as typed>, amount_minor=…, hold_days=7 | execute_before=…,
+  idempotency_seed=…, consent_token=…)`: when `payments.quote(...)` refused a phone
+  with `RECIPIENT_HAS_NO_ACCOUNT` + `deferred_quote`, this builds the intent and a
+  **UP3 cart `0.2` that signs the deferred quote** — the phone, the amount, the (empty)
+  fee legs and an **execution window** `execute_before` (UP3 0.2-draft R1–R4) — and
+  posts the chain to `POST /v1/deferred-transfers/send` with nothing else about the
+  instruction. The bank verifies the consent before placing the hold, spends the quote
+  with the row, bounds the hold by the window (≤ 7 days) and answers the deferred
+  transfer with its fee line (`quote_id`, `settlement_rail=bdk.internal`, `fees_minor`,
+  `fee_total_minor`, `total_debit_minor`, `fee_grid_version`) and `sm_reference`. No
+  PaymentMandate at this step (none exists until the recipient's account does).
+- `up3.build_deferred_cart_v02(intent, refusal=…, beneficiary_value=…, amount_minor=…)`
+  for callers that post the chain themselves.
+- `deferred_transfers.send(...)` also takes `quote_id=` alone (the quote is the whole
+  instruction; `recipient_handle` / `amount_minor` / `funding_source` become optional
+  and may only repeat the quote) or `intent_mandate=` + `cart_mandate=`
+  (`client_transaction_id` defaults to `cart.id`). The legacy full-instruction call is
+  unchanged.
+- New bank error on this path: `UP3_EXECUTION_WINDOW_INVALID` (422, validation) —
+  the window is missing on a deferred quote, ends before the cart does, or ends more
+  than 7 days after the tap. `QUOTE_MISMATCH` / `QUOTE_CONSUMED` (with the hold's
+  `sm_reference`) / `QUOTE_EXPIRED` as on payments; the UP3 codes when a cart signs.
+
+## [0.3.0] — 2026-10-31
+
+### The transfer route from the SDK — preview, then confirm with a cart that signs the quote
+
+- `payments.quote(user_id, beneficiary_type=, beneficiary_value=, amount_minor=)`
+  previews one transfer (any IBAN, a phone, a saved beneficiary): the rail
+  (`bdk.internal` free · `bdk.rtgs` bank leg 2 500 F), the fee legs, the
+  display name, and a `quote {id, digest, digest_alg, expires_at}`. Moves no money.
+- `payments.send_with_mandates(user_id, user_ref=…, quote=<that response>)`
+  confirms it: the SDK builds the intent and a **UP3 cart `0.2`** that signs the
+  quote (`beneficiary {type, value}`, `quote {id, digest, digest_alg}`, the fee
+  legs — P17) and posts the chain with no amount / IBAN / name in the body. The
+  bank binds the cart to the quote it stored and bills exactly the quoted fee
+  (`UP3_QUOTE_DRIFT` / `UP3_FEE_DRIFT` otherwise). The cart never outlives the
+  quote (P12). `description` is optional (it becomes the motif after the
+  reference). `idempotency_seed` keeps the retry contract.
+- `up3.build_cart_v02(intent, quote=…)` for callers that post the chain themselves.
+- The instruction arguments of `send_with_mandates` (`amount_minor`, `currency`,
+  `beneficiary_iban`, `beneficiary_name`, `description`) are now optional and
+  required only without `quote=`; a missing one raises `ValueError` before any
+  request. `quote_id=` beside a full instruction still works (0.1 cart).
+- `deferred_transfers.list(user_id, client_transaction_id=…)` (bank B-71): the
+  transfer you sent under your own id, whatever its status.
+- Responses and webhooks: read **`sm_reference`** (same value as
+  `customer_reference`, which is deprecated and dropped in 0.4.0). Every
+  `payment.*` of a quote-confirmed send, and the send / status responses, carry
+  the fee line typed as `starmoney.FeeLine` (`quote_id`, `settlement_rail`,
+  `fees_minor {orchestrator, bank}`, `fee_total_minor`, `total_debit_minor`,
+  `fee_grid_version`); `payment.failed` carries `funds` (`starmoney.FundsOutcome`:
+  `not_debited` | `debited_under_review`).
+- `accounts.resolve_self(user_id)` (bank PR-G): the caller's own account
+  references and state under a user-scoped JWT — use it instead of
+  `get_user_by_phone` for "show me my account".
+- Version in lockstep with the bank service: `0.3.0`.
+
+## [0.2.3] — 2026-10-27
+
+### `customer_reference` on the payment responses
+
+- `payments.send()`, `payments.send_with_mandates()` and `payments.get_status()`
+  now return `customer_reference` (e.g. `SM-7KQ4X-9TDB2`), the same value as
+  the transfer's `payment.*` webhooks and its `get_transfer_history()` row, so
+  a confirmation screen can show it right after the send. A replayed mandated
+  send (`ALREADY_COMPLETED` / `ALREADY_IN_PROGRESS` / `ALREADY_FAILED`)
+  returns the original payment's reference.
+- The `detail` → plain-string revert moves past 0.2.3; this release is
+  additive only.
+
+## [0.2.2] — 2026-10-20
+
+### `customer_reference` — StarMoney's reference for the customer to quote
+
+- New `customer_reference` (e.g. `SM-7KQ4X-9TDB2`) on every `payment.*`,
+  `deferred_transfer.*` and `payment.received` webhook, on
+  `accounts.get_transfer_history()` rows and on every `deferred_transfers`
+  response (send, get, cancel/claim, list). StarMoney mints it; the same
+  transfer always carries the same value, and a deferred transfer keeps one
+  reference from send to settle. Show it to the customer instead of your own
+  `client_transaction_id`.
+- `accounts.get_transfer_history()` rows and `deferred_transfers.list()`
+  rows also carry `client_transaction_id` (your own id, as sent).
+- Typed on `DeferredTransferSentPayload`, `PaymentReceivedPayload`,
+  `DeferredTransferSettledPayload`.
+- The `detail` → plain-string revert announced for 0.2.2 moves to **0.2.3**;
+  this release is additive only.
+
+## [0.2.1] — 2026-10-10
+
+> **Numbering:** from this release the SDK carries the same version as
+> `starmoney-bank-service` (`0.2.1`). This is the release that was announced
+> to consumers as "0.1.26"; no `v0.1.26` tag exists. Pin `v0.2.1`. The
+> follow-up previously called "0.1.27" is `0.2.2`.
+
+### Explainable errors (B-32) — new top-level fields; `detail` is a one-release shim
+
+- The server's error body is now ONE flat shape:
+  `{"error_code", "kind", "message", "error_id", "errors"}`, plus — **for
+  this release only** — a legacy `"detail": {"message", "error_code",
+  "errors"}` OBJECT mirroring those same fields, kept so a consumer still
+  reading `response_data["detail"]["error_code"]` / `["detail"]["errors"]`
+  (the pre-B-32 shape) does not break the moment the server deploys this.
+  **`detail` reverts to a plain string again in SDK 0.2.2** — do not build
+  new code against `detail.*`; read the top-level keys. Every extra field
+  an error carries (`retry_after_seconds`, `beneficiary_id`,
+  `beneficiary_request_id`, `ceiling_minor`, `consumed_minor`,
+  `pending_minor`, `remaining_minor`, `currency`, `lifts_on`,
+  `cancel_reason`, ...) is a top-level key only, never nested under
+  `detail`. See `docs/ERRORS.md` in starmoney-bank-service for the full
+  contract.
+- Every `APIError`/`UP3Error` (sub)class gains `.error_code` (`""` when the
+  server didn't send one), `.kind` (`"validation"` | `"state"` |
+  `"technical"`, defaulted by HTTP status when the server omits it),
+  `.errors` (a list, **never** `None` — `[]` when there is none), `.error_id`
+  and `.message` (the top-level `message`, falling back to the legacy
+  `detail.message`, falling back to the message the SDK derived itself —
+  e.g. from response text on a transport error). Parsing accepts BOTH the
+  new flat shape and the legacy nested `detail` dict, so pinned-old-server
+  consumers keep working during rollout.
+- `InvalidPhoneError.errors[0]["rule"]` is now `"phone.normalisation"` or
+  `"phone.region"`; `InvalidIBANError.errors[0]["rule"]` is one of
+  `"iban.format"` / `"iban.length"` / `"iban.country"` / `"iban.checksum"`.
+
+### Deferred-transfer cancel reason (B-44)
+
+- `deferred_transfers.cancel(deferred_transfer_id, user_id, reason=None)` —
+  `reason` is `"recipient_unreachable"` or `"sender_request"` (server
+  default when omitted). The response's `cancel_reason` echoes the effective
+  value. An unrecognised `reason` raises `ValidationError` (422).
+
+## [0.1.25] — 2026-10-08
+
+### Beneficiaries by phone (B-27)
+
+- `beneficiaries.create(user_id, name, phone=..., client_reference=...)`: save a
+  number. 201 when its holder already has a StarMoney account (status `active`,
+  `iban` = their vIBAN); 202 when not (status `pending`, `beneficiary_request_id`,
+  `expires_at`). `iban` is now optional; exactly one of `iban` / `phone`.
+- `beneficiaries.list(user_id, status="all" | "active" | "pending")`: one list; pending
+  items have `iban` `None` and carry `beneficiary_request_id` + `expires_at`.
+- New resource `client.beneficiary_requests`: `get`, `cancel`, `invite` (records
+  `invited_at`; the consumer sends the template).
+- New webhook events `beneficiary.added` and `beneficiary_request.expired`
+  (`BeneficiaryAddedPayload`, `BeneficiaryRequestExpiredPayload`).
+- New exceptions `SelfTransferNotAllowedError` (422), `InvalidPhoneError` (422),
+  `BeneficiaryAddLimitReachedError` (429, `.retry_after_seconds`);
+  `DuplicateResourceError.existing_id` names the existing beneficiary or request.
+  `BENEFICIARY_ACCOUNT_CLOSED` (409, a send to a closed holder) is a
+  `DuplicateResourceError` with that code in `response_data`.
+
+## [0.1.24] — 2026-10-04
+
+### UP3 refusals are UP3 errors, never "duplicates"
+
+- New exceptions `UP3MandateRequired` (409, profile P9), `UP3PayerMismatch` (409,
+  P2), `UP3IssuerMismatch` (409, P3) and `UP3TypeRequiredMissing` (422, P10). A
+  409 carrying one of these codes used to surface as `DuplicateResourceError`,
+  whose name says "already exists" — a caller mapping that to "already done"
+  would tell a customer money left when nothing was sent.
+- Any `UP3_*` code this SDK does not know yet is raised as `UP3Error` with
+  `.code` set, never as `DuplicateResourceError` or a bare `APIError`.
+
+## [0.1.23] — 2026-10-04
+
+### `send_with_mandates` returns the envelopes it signed
+
+- The returned dict now also carries `intent_mandate` and `cart_mandate`: the
+  exact signed envelopes this call posted (with your `confirmed_at` and the
+  consent evidence). Store them against your consent record instead of only
+  the cart id. Extra keys; nothing in the bank's response moves.
+
+## [0.1.22] — 2026-10-03
+
+### UP3 fixes for the Mandate flow (B-20)
+
+- `payments.send_with_mandates(..., confirmed_at=...)`: pass the moment the user
+  actually confirmed the terms (Flow submit / button tap, RFC 3339 Z). It is
+  signed into the cart and the bank measures consent freshness from it. The
+  default stays "now", which is only right at the tap itself.
+- `payments.cart_id_for(seed)` and `up3.cart_id_for(seed)`: the cart.id (= the
+  client_transaction_id) a seed derives to, without building a cart. Use it after
+  a timed-out `send_with_mandates`: `get_status(user_id, cart_id_for(seed))` tells
+  you whether the bank captured the payment before offering a fresh consent.
+- `send_with_mandates` no longer "verifies" the returned PaymentMandate: it
+  checked the bank's signature with the client's own secret, which can only
+  fail, and ignored the result. `up3.verify_payment_mandate(envelope,
+  orchestrator_secret=...)` stays for callers that hold the Orchestrator's key.
+- `deferred_transfers.send(..., user_id=...)`: the sender is passed to the
+  request signer, so the call no longer needs raw HTTP to set the JWT subject.
 
 ## [0.1.21] — 2026-09-28
 
