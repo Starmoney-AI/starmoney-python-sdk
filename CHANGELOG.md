@@ -2,6 +2,15 @@
 
 ## [Unreleased]
 
+### The bank's `detail` is a plain string again (bank PR-J) — no SDK change
+
+- The server retires the one-release `detail` object (0.2.1 → 0.3.0) and sends
+  `detail` as the `message` string. The SDK has read the top-level keys
+  (`error_code`, `kind`, `message`, `errors`, extras) since 0.2.1 and already
+  treats a string `detail` as the message, so every exception class maps as
+  before. A consumer that bypasses the SDK and indexes `response_data["detail"][...]`
+  must read the top-level key of the same name instead.
+
 ### History rows carry the fee line (bank PR-I)
 
 - `accounts.get_transfer_history(user_id)` rows now carry the fee line (`quote_id`,
