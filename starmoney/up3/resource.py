@@ -135,6 +135,9 @@ class UP3Resource:
         build_cart(...)     — Build and sign a 0.1 CartMandate dict (IBAN by value).
         build_cart_v02(...) — Build and sign a 0.2 CartMandate that signs a quote
                               from ``client.payments.quote(...)`` (transfer routes).
+        build_deferred_cart_v02(...) — Build and sign a 0.2 CartMandate that consents
+                              to a deferred transfer (the hold from a
+                              ``RECIPIENT_HAS_NO_ACCOUNT`` refusal's deferred_quote).
         cart_id_for(seed)   — The cart.id a seed derives to (retry / status lookup).
         verify_payment_mandate(envelope, orchestrator_secret=...) -> bool —
             Verify a PaymentMandate with the ORCHESTRATOR's key (not the
@@ -414,6 +417,132 @@ class UP3Resource:
             "beneficiary_name": beneficiary_name,
             "quote": {"id": quote_id, "digest": digest, "digest_alg": digest_alg},
             "fees_minor": fees_minor,
+            "confirmed_at": confirmed_at,
+            "user_consent_evidence": consent_evidence,
+        }
+        envelope: dict[str, Any] = {
+            "version": "0.2",
+            "type": "cart",
+            "id": mandate_id,
+            "issued_at": now,
+            "expires_at": expires,
+            "issuer": self._issuer,
+            "payload": payload,
+        }
+        envelope["signature"] = sign(envelope, secret=self._secret)
+        return envelope
+
+    def build_deferred_cart_v02(
+        self,
+        intent_mandate: dict[str, Any],
+        *,
+        refusal: dict[str, Any],
+        beneficiary_value: str,
+        amount_minor: int,
+        currency: str = "XOF",
+        execute_before: Optional[str] = None,
+        hold_days: int = 7,
+        confirmed_at: Optional[str] = None,
+        consent_evidence: Optional[dict[str, Any]] = None,
+        ttl_minutes: int = 2,
+        idempotency_seed: Optional[str] = None,
+    ) -> dict[str, Any]:
+        """Build and sign a **0.2** CartMandate that consents to a DEFERRED
+        transfer — the hold from the quote (bank PR-D, B-67).
+
+        When ``payments.quote(...)`` answers **422 ``RECIPIENT_HAS_NO_ACCOUNT``**
+        for a phone nobody holds yet, the refusal carries ``deferred_quote``:
+        the quote of the hold the sender may place instead (``bdk.internal``,
+        no fee — the money moves inside BDK when the recipient opens their
+        account). This cart signs that quote, the phone **as the customer
+        typed it**, the amount, and an **execution window**
+        (``execute_before``, UP3 0.2-draft R1–R4): the latest moment the bank
+        may still execute the consented transfer — the hold runs until then
+        (at most the bank's 7-day ceiling) and lapses unclaimed after it.
+
+        Args:
+            intent_mandate: The signed IntentMandate from :meth:`build_intent`
+                (``max_amount_minor`` must cover ``amount_minor``).
+            refusal: The whole 422 body (``error_code`` =
+                ``RECIPIENT_HAS_NO_ACCOUNT`` with ``deferred_quote``) **or** its
+                ``deferred_quote`` dict (``id``, ``digest``, ``digest_alg``,
+                ``expires_at``, ``fees_minor``). A refusal without a deferred
+                quote (the recipient is mid-onboarding) cannot be consented.
+            beneficiary_value: The phone the customer typed (E.164) — the
+                deferred quote names no payee; the bank compares it with the
+                phone it quoted.
+            amount_minor: The amount quoted (the refusal does not repeat it).
+            currency: ``XOF``.
+            execute_before: RFC 3339 Z timestamp — the end of the execution
+                window. Defaults to ``confirmed_at + hold_days`` days.
+            hold_days: Default window length when ``execute_before`` is not
+                given (1–7; the bank caps the hold at 7 days).
+            confirmed_at: RFC 3339 Z timestamp of the user's tap. Defaults to now.
+            consent_evidence: ``user_consent_evidence``; defaults to
+                ``{"type": "service_attestation", "data": {}}``.
+            ttl_minutes: Cart lifetime (default 2), clamped to the quote's (P12).
+            idempotency_seed: Same contract as :meth:`build_cart`: the SAME seed
+                on a retry derives the same ``cart.id``, which is the
+                ``client_transaction_id`` of the hold — the bank answers the
+                stored deferred transfer.
+
+        Returns:
+            Signed ``version: "0.2"`` CartMandate envelope with
+            ``payload.execute_before``, ready to POST as ``cart_mandate`` on
+            ``POST /v1/deferred-transfers/send`` with no instruction fields.
+
+        Raises:
+            ValueError: no deferred quote in the refusal, a non-E.164 phone, a
+                non-positive amount, or ``hold_days`` outside 1–7.
+        """
+        dq = refusal.get("deferred_quote") if "deferred_quote" in refusal else refusal
+        if not isinstance(dq, dict) or "digest" not in dq:
+            raise ValueError(
+                "build_deferred_cart_v02 needs the RECIPIENT_HAS_NO_ACCOUNT refusal that carries "
+                "deferred_quote {id, digest, digest_alg, expires_at, fees_minor} — a refusal "
+                "without one (recipient mid-onboarding) cannot be consented; ask again later"
+            )
+        try:
+            quote_id, digest, digest_alg = dq["id"], dq["digest"], dq["digest_alg"]
+            fees_minor = dict(dq["fees_minor"])
+        except (KeyError, TypeError) as exc:
+            raise ValueError(f"deferred_quote lacks {exc!r}") from exc
+        if not isinstance(beneficiary_value, str) or not beneficiary_value.startswith("+"):
+            raise ValueError("beneficiary_value must be the recipient's phone in E.164 form (+221…)")
+        amount_minor = int(amount_minor)
+        if amount_minor <= 0:
+            raise ValueError("amount_minor must be > 0")
+        if not 1 <= int(hold_days) <= 7:
+            raise ValueError("hold_days must be between 1 and 7 (the bank caps the hold at 7 days)")
+        if confirmed_at is None:
+            confirmed_at = _now_z()
+        if execute_before is None:
+            anchor = datetime.strptime(confirmed_at, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=timezone.utc)
+            execute_before = (anchor + timedelta(days=int(hold_days))).strftime("%Y-%m-%dT%H:%M:%SZ")
+        else:
+            execute_before = _to_z(execute_before)
+        if consent_evidence is None:
+            consent_evidence = {"type": "service_attestation", "data": {}}
+
+        intent_id = intent_mandate["id"]
+        intent_payload = intent_mandate["payload"]
+        mandate_id = _derive_cart_id(self._issuer, idempotency_seed) if idempotency_seed is not None else _mandate_id()
+        now = _now_z()
+        expires = _future_z(ttl_minutes)
+        quote_expires = dq.get("expires_at")
+        if isinstance(quote_expires, str) and quote_expires:
+            expires = min(expires, _to_z(quote_expires))  # P12: never past the quote
+
+        payload: dict[str, Any] = {
+            "intent_mandate_id": intent_id,
+            "user_ref": intent_payload["user_ref"],
+            "amount_minor": amount_minor,
+            "currency": currency,
+            "beneficiary": {"type": "msisdn", "value": beneficiary_value},
+            "beneficiary_name": None,  # nobody holds the number yet: no name was shown
+            "quote": {"id": quote_id, "digest": digest, "digest_alg": digest_alg},
+            "fees_minor": fees_minor,
+            "execute_before": execute_before,
             "confirmed_at": confirmed_at,
             "user_consent_evidence": consent_evidence,
         }

@@ -1,5 +1,33 @@
 # Changelog
 
+## [Unreleased]
+
+### The hold from the quote — a deferred transfer confirmed with a UP3 cart (bank PR-D, B-67)
+
+- `deferred_transfers.send_with_mandates(user_id, user_ref=…, refusal=<the 422 body>,
+  beneficiary_value=<the phone as typed>, amount_minor=…, hold_days=7 | execute_before=…,
+  idempotency_seed=…, consent_token=…)`: when `payments.quote(...)` refused a phone
+  with `RECIPIENT_HAS_NO_ACCOUNT` + `deferred_quote`, this builds the intent and a
+  **UP3 cart `0.2` that signs the deferred quote** — the phone, the amount, the (empty)
+  fee legs and an **execution window** `execute_before` (UP3 0.2-draft R1–R4) — and
+  posts the chain to `POST /v1/deferred-transfers/send` with nothing else about the
+  instruction. The bank verifies the consent before placing the hold, spends the quote
+  with the row, bounds the hold by the window (≤ 7 days) and answers the deferred
+  transfer with its fee line (`quote_id`, `settlement_rail=bdk.internal`, `fees_minor`,
+  `fee_total_minor`, `total_debit_minor`, `fee_grid_version`) and `sm_reference`. No
+  PaymentMandate at this step (none exists until the recipient's account does).
+- `up3.build_deferred_cart_v02(intent, refusal=…, beneficiary_value=…, amount_minor=…)`
+  for callers that post the chain themselves.
+- `deferred_transfers.send(...)` also takes `quote_id=` alone (the quote is the whole
+  instruction; `recipient_handle` / `amount_minor` / `funding_source` become optional
+  and may only repeat the quote) or `intent_mandate=` + `cart_mandate=`
+  (`client_transaction_id` defaults to `cart.id`). The legacy full-instruction call is
+  unchanged.
+- New bank error on this path: `UP3_EXECUTION_WINDOW_INVALID` (422, validation) —
+  the window is missing on a deferred quote, ends before the cart does, or ends more
+  than 7 days after the tap. `QUOTE_MISMATCH` / `QUOTE_CONSUMED` (with the hold's
+  `sm_reference`) / `QUOTE_EXPIRED` as on payments; the UP3 codes when a cart signs.
+
 ## [0.3.0] — 2026-10-31
 
 ### The transfer route from the SDK — preview, then confirm with a cart that signs the quote

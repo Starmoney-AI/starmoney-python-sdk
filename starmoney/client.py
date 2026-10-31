@@ -155,6 +155,8 @@ class StarmoneyClient:
         """Access deferred transfers resource (flow 01)."""
         if self._deferred_transfers is None:
             self._deferred_transfers = DeferredTransfersResource(self._http_client)
+            # Wire UP3 resource so send_with_mandates works (PR-D).
+            self._deferred_transfers._up3 = self._up3_resource
         return self._deferred_transfers
 
     @property
