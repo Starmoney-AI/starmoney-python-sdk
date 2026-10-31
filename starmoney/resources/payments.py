@@ -29,28 +29,43 @@ class PaymentsResource:
     async def send(
         self,
         user_id: str,
-        amount: Decimal | float | str,
-        currency: str,
-        beneficiary_iban: str,
-        beneficiary_name: str,
-        description: str,
-        rail_name: Optional[str],
-        client_transaction_id: str,
+        amount: Decimal | float | str | None = None,
+        currency: str = "XOF",
+        beneficiary_iban: Optional[str] = None,
+        beneficiary_name: Optional[str] = None,
+        description: Optional[str] = None,
+        rail_name: Optional[str] = None,
+        client_transaction_id: Optional[str] = None,
         metadata: Optional[dict[str, Any]] = None,
         client_reference: Optional[str] = None,
         intent_mandate: Optional[dict[str, Any]] = None,
         cart_mandate: Optional[dict[str, Any]] = None,
+        *,
+        quote_id: Optional[str] = None,
     ) -> dict[str, Any]:
         """
         Send a payment, optionally with a UP3 mandate chain.
 
+        Two ways to name the instruction (transfer routes, 0.3.0):
+          - **confirm a quote**: ``quote_id`` from :meth:`quote`; amount,
+            currency and the recipient come from the quote (the resolved IBAN
+            never travels through the client). ``beneficiary_name`` and
+            ``description`` are optional. amount / beneficiary_iban MAY be
+            given and must then equal the quote (422 QUOTE_MISMATCH).
+          - **legacy**: amount + beneficiary_iban + beneficiary_name +
+            description, unchanged.
+
         Args:
             user_id: User ID sending the payment.
-            amount: Payment amount (Decimal, float, or string).
+            amount: Payment amount (Decimal, float, or string). Required
+                without ``quote_id``.
             currency: Currency code (e.g., 'XOF').
-            beneficiary_iban: Recipient's IBAN.
-            beneficiary_name: Recipient's name.
-            description: Payment description.
+            beneficiary_iban: Recipient's IBAN. Required without ``quote_id``.
+            beneficiary_name: Recipient's name. Required without ``quote_id``.
+            description: Payment description. Required without ``quote_id``.
+            quote_id: The quote to confirm (``quote["quote"]["id"]`` from
+                :meth:`quote`). Consumed once; a retry with the same
+                ``client_transaction_id`` answers the stored outcome (200).
             rail_name: Optional routing hint (e.g. 'BDK', 'VIBAN'). Omit to let
                        StarMoney select the rail (ADR-001) — VIBAN when the sender
                        can fund from their vIBAN, else BDK.
@@ -66,10 +81,20 @@ class PaymentsResource:
             client_transaction_id, customer_reference (since 0.2.3), status,
             created_at, and optionally
             payment_mandate (revision-1 PaymentMandate signed by StarMoney).
+            A quote-confirmed send also carries ``quote_id``, ``settlement_rail``,
+            ``fees_minor {orchestrator, bank}``, ``fee_total_minor``,
+            ``total_debit_minor`` and ``fee_grid_version`` (null on a legacy send).
 
         Raises:
             InvalidIBANError (422): beneficiary_iban failed format or mod-97 —
                 raised client-side before the request, and by the server.
+            ValueError: neither quote_id nor the full legacy instruction given.
+            With quote_id (B-32 envelopes): 404 QUOTE_NOT_FOUND, 409
+                QUOTE_CONSUMED (carries the consuming ``transaction_id`` +
+                ``customer_reference``), 410 QUOTE_EXPIRED (re-quote), 422
+                QUOTE_MISMATCH (``errors[]`` names the field), 409 RAIL_CHANGED
+                (re-quote), 402 INSUFFICIENT_FUNDS (``required_minor``),
+                404 NO_VIBAN_ACCOUNT.
             PreKycCeilingExceededError (403): over the per-send pre-KYC ceiling.
             PreKycTotalCeilingExceededError (403): over the cumulative pre-KYC
                 send ceiling; carries ceiling / consumed / pending / remaining.
@@ -79,25 +104,48 @@ class PaymentsResource:
                 not an error — it returns the stored outcome (HTTP 200).
             DuplicateResourceError (409): non-mandated duplicate client_transaction_id.
         """
-        if not is_valid_iban(beneficiary_iban):
+        if client_transaction_id is None:
+            raise ValueError("client_transaction_id is required (idempotency key)")
+        if quote_id is None:
+            missing = [
+                name
+                for name, value in (
+                    ("amount", amount),
+                    ("beneficiary_iban", beneficiary_iban),
+                    ("beneficiary_name", beneficiary_name),
+                    ("description", description),
+                )
+                if value is None
+            ]
+            if missing:
+                raise ValueError(
+                    f"Without quote_id these are required: {', '.join(missing)} "
+                    "(preview with client.payments.quote(...) and pass quote_id, "
+                    "or send the full instruction)"
+                )
+        if beneficiary_iban is not None and not is_valid_iban(beneficiary_iban):
             raise InvalidIBANError(f"Invalid IBAN: {beneficiary_iban!r} failed mod-97 validation")
 
-        # Convert amount to string for API
-        if isinstance(amount, Decimal):
-            amount_str = str(amount)
-        elif isinstance(amount, float):
-            amount_str = f"{amount:.2f}"
-        else:
-            amount_str = str(amount)
-
         payload: dict[str, Any] = {
-            "amount": amount_str,
             "currency": currency,
-            "beneficiary_iban": beneficiary_iban,
-            "beneficiary_name": beneficiary_name,
-            "description": description,
             "client_transaction_id": client_transaction_id,
         }
+        if amount is not None:
+            # Convert amount to string for API
+            if isinstance(amount, Decimal):
+                payload["amount"] = str(amount)
+            elif isinstance(amount, float):
+                payload["amount"] = f"{amount:.2f}"
+            else:
+                payload["amount"] = str(amount)
+        if beneficiary_iban is not None:
+            payload["beneficiary_iban"] = beneficiary_iban
+        if beneficiary_name is not None:
+            payload["beneficiary_name"] = beneficiary_name
+        if description is not None:
+            payload["description"] = description
+        if quote_id is not None:
+            payload["quote_id"] = quote_id
         # ADR-001: rail_name is an optional routing hint. Omit it when not given;
         # StarMoney selects the rail server-side.
         if rail_name is not None:
@@ -202,9 +250,16 @@ class PaymentsResource:
         cart_ttl_minutes: int = 2,
         idempotency_seed: Optional[str] = None,
         confirmed_at: Optional[str] = None,
+        quote_id: Optional[str] = None,
     ) -> dict[str, Any]:
         """
         Build Intent + Cart mandates and submit the payment — all in one call.
+
+        ``quote_id`` (transfer routes, 0.3.0): confirm the quote the customer
+        previewed; the 0.1 cart built here still carries the IBAN and amount
+        the caller passes, which must equal the quote's (the bank refuses
+        QUOTE_MISMATCH otherwise). The 0.2 cart that signs the quote digest
+        instead of the IBAN arrives with the bank's PR-C.
 
         This is the method skills and chatbot flows should call. Internally it:
           1. Builds and signs an IntentMandate.
@@ -345,6 +400,7 @@ class PaymentsResource:
             client_reference=client_reference,
             intent_mandate=intent,
             cart_mandate=cart,
+            quote_id=quote_id,
         )
 
         # 0.1.23: hand back the exact signed envelopes that were posted, so the
