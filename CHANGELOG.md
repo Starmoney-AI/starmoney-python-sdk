@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+### History rows carry the fee line (bank PR-I)
+
+- `accounts.get_transfer_history(user_id)` rows now carry the fee line (`quote_id`,
+  `settlement_rail`, `fees_minor`, `fee_total_minor`, `total_debit_minor`,
+  `fee_grid_version`; `None` on a row that confirmed no quote) beside `sm_reference` —
+  the same `FeeLine` keys as the send / status responses. No SDK code change; the rows
+  are returned as the bank sends them.
+
 ### The hold from the quote — a deferred transfer confirmed with a UP3 cart (bank PR-D, B-67)
 
 - `deferred_transfers.send_with_mandates(user_id, user_ref=…, refusal=<the 422 body>,
