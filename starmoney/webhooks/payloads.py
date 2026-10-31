@@ -41,6 +41,7 @@ class _DeferredTransferSentPayloadRequired(TypedDict):
     transaction_id: str  # the deferred_transfer_id
     client_transaction_id: str
     customer_reference: str  # StarMoney's reference for the customer to quote (0.2.2)
+    sm_reference: str  # the same reference under its 0.3.0 name; customer_reference is dropped in 0.4.0
     user_id: str  # sender_user_id
     created_by_service: str
     recipient_handle: str
@@ -69,6 +70,7 @@ class _PaymentReceivedPayloadRequired(TypedDict):
     transaction_id: str  # internal correlation id; no transactions row exists for a credit
     client_transaction_id: None  # inbound credits have no client-supplied idempotency key
     customer_reference: str  # StarMoney's reference for the customer to quote (0.2.2)
+    sm_reference: str  # the same reference under its 0.3.0 name; customer_reference is dropped in 0.4.0
     user_id: str
     created_by_service: str
     account_reference: str  # MASKED via mask_handle — never the full IBAN/RIB
@@ -105,6 +107,7 @@ class _DeferredTransferSettledPayloadRequired(TypedDict):
     transaction_id: str  # the deferred_transfer_id
     client_transaction_id: str
     customer_reference: str  # StarMoney's reference for the customer to quote (0.2.2)
+    sm_reference: str  # the same reference under its 0.3.0 name; customer_reference is dropped in 0.4.0
     user_id: str  # the SENDER's user id ("" before 0.1.21 / bank S-35)
     created_by_service: str
     amount_minor: int
