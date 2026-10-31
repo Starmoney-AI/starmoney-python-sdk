@@ -312,3 +312,20 @@ async def test_send_threads_user_id_to_the_request_signer():
         user_id="sender-user-id",
     )
     assert http.post.call_args.kwargs["user_id"] == "sender-user-id"
+
+
+@pytest.mark.asyncio
+async def test_list_by_client_transaction_id_is_forwarded_as_a_query_param():
+    """0.3.0 (B-71): find the transfer this flow sent under its own id."""
+    resource, http = _make_resource()
+    mock_resp = MagicMock()
+    mock_resp.json.return_value = _LIST_RESPONSE
+    http.get = AsyncMock(return_value=mock_resp)
+
+    await resource.list(user_id="user-1", client_transaction_id="dt-send-42")
+
+    http.get.assert_called_once_with(
+        "/deferred-transfers",
+        user_id="user-1",
+        params={"limit": 20, "offset": 0, "client_transaction_id": "dt-send-42"},
+    )

@@ -106,7 +106,9 @@ class PaymentsResource:
         """
         if client_transaction_id is None:
             raise ValueError("client_transaction_id is required (idempotency key)")
-        if quote_id is None:
+        # A 0.2 cart signs the quote: the chain is the instruction (P17).
+        quoted_cart = (cart_mandate or {}).get("version") == "0.2"
+        if quote_id is None and not quoted_cart:
             missing = [
                 name
                 for name, value in (
@@ -235,11 +237,11 @@ class PaymentsResource:
         self,
         user_id: str,
         *,
-        amount_minor: int,
-        currency: str,
-        beneficiary_iban: str,
-        beneficiary_name: str,
-        description: str,
+        amount_minor: Optional[int] = None,
+        currency: Optional[str] = None,
+        beneficiary_iban: Optional[str] = None,
+        beneficiary_name: Optional[str] = None,
+        description: Optional[str] = None,
         rail_name: Optional[str] = None,
         user_ref: str,
         client_transaction_id: Optional[str] = None,
@@ -251,15 +253,29 @@ class PaymentsResource:
         idempotency_seed: Optional[str] = None,
         confirmed_at: Optional[str] = None,
         quote_id: Optional[str] = None,
+        quote: Optional[dict[str, Any]] = None,
     ) -> dict[str, Any]:
         """
         Build Intent + Cart mandates and submit the payment — all in one call.
 
-        ``quote_id`` (transfer routes, 0.3.0): confirm the quote the customer
-        previewed; the 0.1 cart built here still carries the IBAN and amount
-        the caller passes, which must equal the quote's (the bank refuses
-        QUOTE_MISMATCH otherwise). The 0.2 cart that signs the quote digest
-        instead of the IBAN arrives with the bank's PR-C.
+        Two ways to name the instruction (transfer routes, 0.3.0):
+
+        - **``quote=``** (preferred): pass the whole ``client.payments.quote(...)``
+          response. The SDK builds a **0.2 cart that signs the quote**
+          (``beneficiary {type, value}``, ``quote {id, digest, digest_alg}``,
+          the quoted fee legs — UP3 0.2-draft P17) and posts the chain with
+          **no instruction fields** in the body: the cart *is* the quote, the
+          bank binds it to the quote it stored and confirms the rail and fee it
+          previewed. ``amount_minor`` / ``currency`` / ``beneficiary_iban`` /
+          ``beneficiary_name`` are read from the quote (do not pass them).
+          ``description`` is optional (it becomes the motif after the
+          ``sm_reference``). The cart's ``expires_at`` never passes the
+          quote's (P12).
+        - **legacy**: ``amount_minor``, ``currency``, ``beneficiary_iban``,
+          ``beneficiary_name``, ``description`` → a 0.1 cart (IBAN by value).
+          ``quote_id`` beside them confirms a quote with a 0.1 cart (the body
+          fields must equal the quote's, else QUOTE_MISMATCH); kept for
+          callers that have not moved to ``quote=``.
 
         This is the method skills and chatbot flows should call. Internally it:
           1. Builds and signs an IntentMandate.
@@ -342,6 +358,44 @@ class PaymentsResource:
                 "send_with_mandates requires the UP3 resource; " "initialise StarmoneyClient with up3_secret=..."
             )
 
+        if quote is not None:
+            return await self._send_with_quoted_cart(
+                user_id=user_id,
+                quote=quote,
+                description=description,
+                beneficiary_name=beneficiary_name,
+                user_ref=user_ref,
+                client_transaction_id=client_transaction_id,
+                client_reference=client_reference,
+                consent_token=consent_token,
+                intent_ttl_minutes=intent_ttl_minutes,
+                cart_ttl_minutes=cart_ttl_minutes,
+                idempotency_seed=idempotency_seed,
+                confirmed_at=confirmed_at,
+                quote_id=quote_id,
+                rail_name=rail_name,
+            )
+
+        missing = [
+            name
+            for name, value in (
+                ("amount_minor", amount_minor),
+                ("currency", currency),
+                ("beneficiary_iban", beneficiary_iban),
+                ("beneficiary_name", beneficiary_name),
+                ("description", description),
+            )
+            if value is None
+        ]
+        if missing:
+            raise ValueError(
+                "send_with_mandates without quote= needs the full instruction: missing "
+                + ", ".join(missing)
+                + " (or pass quote=<the payments.quote(...) response> and let the 0.2 cart sign it)"
+            )
+        assert amount_minor is not None and currency is not None  # for type-checkers
+        assert beneficiary_iban is not None and beneficiary_name is not None and description is not None
+
         # Step 1 — build and sign IntentMandate.
         intent = self._up3.build_intent(
             user_ref=user_ref,
@@ -406,6 +460,77 @@ class PaymentsResource:
         # 0.1.23: hand back the exact signed envelopes that were posted, so the
         # caller's record holds the cart it signed (confirmed_at, evidence),
         # not just its id. Extra keys; nothing in the bank's response moves.
+        return {**response_data, "intent_mandate": intent, "cart_mandate": cart}
+
+    async def _send_with_quoted_cart(
+        self,
+        *,
+        user_id: str,
+        quote: dict[str, Any],
+        description: Optional[str],
+        beneficiary_name: Optional[str],
+        user_ref: str,
+        client_transaction_id: Optional[str],
+        client_reference: Optional[str],
+        consent_token: Optional[dict[str, Any]],
+        intent_ttl_minutes: int,
+        cart_ttl_minutes: int,
+        idempotency_seed: Optional[str],
+        confirmed_at: Optional[str],
+        quote_id: Optional[str],
+        rail_name: Optional[str],
+    ) -> dict[str, Any]:
+        """``send_with_mandates(quote=...)``: the 0.2 cart signs the quote, the body
+        carries the chain and nothing else about the instruction."""
+        assert self._up3 is not None
+        ref = quote.get("quote") or {}
+        if quote_id is not None and quote_id != ref.get("id"):
+            raise ValueError(
+                f"quote_id={quote_id!r} is not the quote passed as quote= ({ref.get('id')!r}); "
+                "pass one or the other"
+            )
+        if rail_name is not None:
+            raise ValueError(
+                "rail_name cannot be combined with quote=: the quote fixed the settlement rail "
+                "(ADR-001, the bank picks it)"
+            )
+        amount_minor = int(quote["amount_minor"])
+        shown_name = quote.get("display_name")
+        if beneficiary_name is None:
+            beneficiary_name = shown_name
+        intent_description = description or f"send {amount_minor} {quote.get('currency', 'XOF')}"
+
+        intent = self._up3.build_intent(
+            user_ref=user_ref,
+            description=intent_description,
+            max_amount_minor=amount_minor,
+            currency=quote.get("currency", "XOF"),
+            beneficiary_hint=beneficiary_name or quote.get("beneficiary", {}).get("value"),
+            ttl_minutes=intent_ttl_minutes,
+        )
+        cart = self._up3.build_cart_v02(
+            intent,
+            quote=quote,
+            beneficiary_name=beneficiary_name,
+            confirmed_at=confirmed_at,
+            consent_evidence=consent_token,
+            ttl_minutes=cart_ttl_minutes,
+            idempotency_seed=idempotency_seed,
+        )
+        if client_transaction_id is not None and client_transaction_id != cart["id"]:
+            raise ValueError(
+                f"client_transaction_id={client_transaction_id!r} does not match "
+                f"cart.id={cart['id']!r}; omit it (it defaults to cart.id) or pass idempotency_seed."
+            )
+        response_data = await self.send(
+            user_id=user_id,
+            currency=quote.get("currency", "XOF"),
+            description=description,
+            client_transaction_id=cart["id"],
+            client_reference=client_reference,
+            intent_mandate=intent,
+            cart_mandate=cart,
+        )
         return {**response_data, "intent_mandate": intent, "cart_mandate": cart}
 
     def cart_id_for(self, idempotency_seed: str) -> str:

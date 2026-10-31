@@ -90,6 +90,8 @@ from .exceptions import (
 )
 from .webhooks.events import WebhookEvent
 from .webhooks.payloads import (
+    FeeLine,
+    FundsOutcome,
     AccountKycReviewRequiredPayload,
     AccountKycVerifiedPayload,
     AccountLifecyclePayload,
@@ -125,6 +127,8 @@ __all__ = [
     "AccountOpenedPayload",
     "AccountKycVerifiedPayload",
     "AccountKycReviewRequiredPayload",
+    "FeeLine",
+    "FundsOutcome",
     # Base exceptions
     "StarmoneyError",
     "APIError",

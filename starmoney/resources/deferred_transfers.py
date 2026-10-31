@@ -98,6 +98,7 @@ class DeferredTransfersResource:
         status: Optional[str] = None,
         limit: int = 20,
         offset: int = 0,
+        client_transaction_id: Optional[str] = None,
     ) -> dict[str, Any]:
         """
         List the caller's deferred transfers (sender-scoped) — for a cancel pick-list.
@@ -115,11 +116,18 @@ class DeferredTransfersResource:
                     claimed_pending_kyc, settled, expired, released, cancelled.
             limit: Max transfers to return (default 20, capped at 100 server-side).
             offset: Number of transfers to skip (pagination).
+            client_transaction_id: (0.3.0, B-71) only the transfer YOU sent under
+                    this idempotency key — e.g. to find a deferred transfer's
+                    ``deferred_transfer_id`` / ``sm_reference`` from the id your
+                    flow kept. When given and ``status`` is omitted, every status
+                    is searched (settled, expired… too), not just the cancellable
+                    set. Still sender-scoped: another sender's id never matches.
 
         Returns:
             Dict with keys:
               user_id, limit, offset, deferred_transfers (list). Each item has:
-              deferred_transfer_id, customer_reference, client_transaction_id,
+              deferred_transfer_id, sm_reference (customer_reference until 0.4.0),
+              client_transaction_id,
               recipient_handle (MASKED, e.g. '+2217xxxxxx99'),
               amount_minor, currency, status, created_at, expires_at.
 
@@ -129,6 +137,8 @@ class DeferredTransfersResource:
         params: dict[str, Any] = {"limit": limit, "offset": offset}
         if status is not None:
             params["status"] = status
+        if client_transaction_id is not None:
+            params["client_transaction_id"] = client_transaction_id
 
         response = await self.http.get("/deferred-transfers", user_id=user_id, params=params)
         return response.json()

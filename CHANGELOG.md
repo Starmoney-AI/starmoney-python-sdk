@@ -1,5 +1,40 @@
 # Changelog
 
+## [0.3.0] — 2026-10-31
+
+### The transfer route from the SDK — preview, then confirm with a cart that signs the quote
+
+- `payments.quote(user_id, beneficiary_type=, beneficiary_value=, amount_minor=)`
+  previews one transfer (any IBAN, a phone, a saved beneficiary): the rail
+  (`bdk.internal` free · `bdk.rtgs` bank leg 2 500 F), the fee legs, the
+  display name, and a `quote {id, digest, digest_alg, expires_at}`. Moves no money.
+- `payments.send_with_mandates(user_id, user_ref=…, quote=<that response>)`
+  confirms it: the SDK builds the intent and a **UP3 cart `0.2`** that signs the
+  quote (`beneficiary {type, value}`, `quote {id, digest, digest_alg}`, the fee
+  legs — P17) and posts the chain with no amount / IBAN / name in the body. The
+  bank binds the cart to the quote it stored and bills exactly the quoted fee
+  (`UP3_QUOTE_DRIFT` / `UP3_FEE_DRIFT` otherwise). The cart never outlives the
+  quote (P12). `description` is optional (it becomes the motif after the
+  reference). `idempotency_seed` keeps the retry contract.
+- `up3.build_cart_v02(intent, quote=…)` for callers that post the chain themselves.
+- The instruction arguments of `send_with_mandates` (`amount_minor`, `currency`,
+  `beneficiary_iban`, `beneficiary_name`, `description`) are now optional and
+  required only without `quote=`; a missing one raises `ValueError` before any
+  request. `quote_id=` beside a full instruction still works (0.1 cart).
+- `deferred_transfers.list(user_id, client_transaction_id=…)` (bank B-71): the
+  transfer you sent under your own id, whatever its status.
+- Responses and webhooks: read **`sm_reference`** (same value as
+  `customer_reference`, which is deprecated and dropped in 0.4.0). Every
+  `payment.*` of a quote-confirmed send, and the send / status responses, carry
+  the fee line typed as `starmoney.FeeLine` (`quote_id`, `settlement_rail`,
+  `fees_minor {orchestrator, bank}`, `fee_total_minor`, `total_debit_minor`,
+  `fee_grid_version`); `payment.failed` carries `funds` (`starmoney.FundsOutcome`:
+  `not_debited` | `debited_under_review`).
+- `accounts.resolve_self(user_id)` (bank PR-G): the caller's own account
+  references and state under a user-scoped JWT — use it instead of
+  `get_user_by_phone` for "show me my account".
+- Version in lockstep with the bank service: `0.3.0`.
+
 ## [0.2.3] — 2026-10-27
 
 ### `customer_reference` on the payment responses

@@ -23,7 +23,28 @@ shapes.
 
 from __future__ import annotations
 
-from typing import Optional, TypedDict
+from typing import Literal, Optional, TypedDict
+
+
+class FeeLine(TypedDict):
+    """The fee line on every ``payment.*`` webhook of a quote-confirmed send
+    (transfer routes, 0.3.0) and on the ``POST /v1/payments`` /
+    ``GET /v1/payments/status/...`` responses. Absent on a legacy send (no
+    quote). ``amount`` on the event stays the principal; ``total_debit_minor``
+    is what left the sender (principal + both fee legs)."""
+
+    quote_id: str
+    settlement_rail: str  # "bdk.internal" (free) | "bdk.rtgs" (bank leg 2 500 F)
+    fees_minor: dict[str, int]  # {"orchestrator": 0, "bank": 2500}
+    fee_total_minor: int
+    total_debit_minor: int
+    fee_grid_version: int
+
+
+# ``funds`` on ``payment.failed`` (B-49, 0.3.0) — closed vocabulary, never
+# renamed: the sender's money was not taken, or it was and the books are
+# under review. One generic failed push per payment (decision D25).
+FundsOutcome = Literal["not_debited", "debited_under_review"]
 
 
 class WebhookMetadata(TypedDict):
@@ -40,8 +61,8 @@ class _DeferredTransferSentPayloadRequired(TypedDict):
     correlation_id: str
     transaction_id: str  # the deferred_transfer_id
     client_transaction_id: str
-    customer_reference: str  # StarMoney's reference for the customer to quote (0.2.2)
-    sm_reference: str  # the same reference under its 0.3.0 name; customer_reference is dropped in 0.4.0
+    sm_reference: str  # StarMoney's reference for the customer to quote (0.3.0) — read this one
+    customer_reference: str  # the same value under its 0.2.2 name; deprecated, dropped in 0.4.0
     user_id: str  # sender_user_id
     created_by_service: str
     recipient_handle: str
@@ -69,8 +90,8 @@ class _PaymentReceivedPayloadRequired(TypedDict):
     correlation_id: str
     transaction_id: str  # internal correlation id; no transactions row exists for a credit
     client_transaction_id: None  # inbound credits have no client-supplied idempotency key
-    customer_reference: str  # StarMoney's reference for the customer to quote (0.2.2)
-    sm_reference: str  # the same reference under its 0.3.0 name; customer_reference is dropped in 0.4.0
+    sm_reference: str  # StarMoney's reference for the customer to quote (0.3.0) — read this one
+    customer_reference: str  # the same value under its 0.2.2 name; deprecated, dropped in 0.4.0
     user_id: str
     created_by_service: str
     account_reference: str  # MASKED via mask_handle — never the full IBAN/RIB
@@ -106,8 +127,8 @@ class _DeferredTransferSettledPayloadRequired(TypedDict):
     correlation_id: str
     transaction_id: str  # the deferred_transfer_id
     client_transaction_id: str
-    customer_reference: str  # StarMoney's reference for the customer to quote (0.2.2)
-    sm_reference: str  # the same reference under its 0.3.0 name; customer_reference is dropped in 0.4.0
+    sm_reference: str  # StarMoney's reference for the customer to quote (0.3.0) — read this one
+    customer_reference: str  # the same value under its 0.2.2 name; deprecated, dropped in 0.4.0
     user_id: str  # the SENDER's user id ("" before 0.1.21 / bank S-35)
     created_by_service: str
     amount_minor: int
@@ -207,6 +228,8 @@ AccountKycReviewRequiredPayload = AccountLifecyclePayload
 
 __all__ = [
     "WebhookMetadata",
+    "FeeLine",
+    "FundsOutcome",
     "BeneficiaryAddedPayload",
     "BeneficiaryRequestExpiredPayload",
     "DeferredTransferSentPayload",
