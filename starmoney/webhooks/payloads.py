@@ -167,6 +167,8 @@ class _DeferredTransferClosedPayloadRequired(TypedDict):
     reason_code: str
     recipient_handle: str
     recipient_user_id: Optional[str]  # set once the recipient claimed
+    sm_reference: str  # StarMoney's reference for the customer to quote (0.3.0) — read this one
+    customer_reference: str  # the same value under its 0.2.2 name; deprecated, dropped in 0.4.0
     metadata: WebhookMetadata
 
 
@@ -203,6 +205,8 @@ class _PaymentInitiatedPayloadRequired(TypedDict):
     beneficiary_name: str
     rail_name: str
     initiated_at: str
+    sm_reference: str  # StarMoney's reference for the customer to quote (0.3.0) — read this one
+    customer_reference: str  # the same value under its 0.2.2 name; deprecated, dropped in 0.4.0
     metadata: WebhookMetadata
 
 
@@ -215,6 +219,15 @@ class PaymentInitiatedPayload(_PaymentInitiatedPayloadRequired, total=False):
     # transfer this payment pays out. user_id / client_reference are the
     # original sender's.
     deferred_transfer_id: str
+    # The fee line (transfer routes, 0.3.0): present only when the send confirmed
+    # a quote (POST /v1/payments with quote_id); absent on a legacy send. Same
+    # keys and meaning as :class:`FeeLine`.
+    quote_id: str
+    settlement_rail: str
+    fees_minor: dict[str, int]
+    fee_total_minor: int
+    total_debit_minor: int
+    fee_grid_version: int
 
 
 class _PaymentRailFailedPayloadRequired(TypedDict):
@@ -237,6 +250,9 @@ class _PaymentRailFailedPayloadRequired(TypedDict):
     beneficiary_name: str
     description: str
     external_reference: Optional[str]
+    sm_reference: str  # StarMoney's reference for the customer to quote (0.3.0) — read this one
+    customer_reference: str  # the same value under its 0.2.2 name; deprecated, dropped in 0.4.0
+    funds: FundsOutcome  # B-49: "not_debited" here, or "debited_under_review" after a ledger refusal
     metadata: WebhookMetadata
 
 
@@ -252,6 +268,15 @@ class PaymentRailFailedPayload(_PaymentRailFailedPayloadRequired, total=False):
 
     client_reference: str  # ADR-004: only present when the caller supplied one
     deferred_transfer_id: str  # only on a deferred transfer's settle payment
+    # The fee line (transfer routes, 0.3.0): present only when the send confirmed
+    # a quote (POST /v1/payments with quote_id); absent on a legacy send. Same
+    # keys and meaning as :class:`FeeLine`.
+    quote_id: str
+    settlement_rail: str
+    fees_minor: dict[str, int]
+    fee_total_minor: int
+    total_debit_minor: int
+    fee_grid_version: int
 
 
 class _PaymentBankStatusPayloadRequired(TypedDict):
@@ -269,6 +294,8 @@ class _PaymentBankStatusPayloadRequired(TypedDict):
     provider: str  # "bdk"
     webhook_raw_data: dict  # BDK's callback, as received
     processed_webhook_data: dict  # {external_reference, new_status, accounting_date, message, ...}
+    sm_reference: str  # StarMoney's reference for the customer to quote (0.3.0) — read this one
+    customer_reference: str  # the same value under its 0.2.2 name; deprecated, dropped in 0.4.0
     metadata: WebhookMetadata
 
 
@@ -279,6 +306,18 @@ class PaymentBankStatusPayload(_PaymentBankStatusPayloadRequired, total=False):
 
     client_reference: str  # ADR-004: only present when the caller supplied one
     deferred_transfer_id: str  # only on a deferred transfer's settle payment
+    # B-49: on payment.failed only — the bank had accepted, so always
+    # "debited_under_review" on this path.
+    funds: FundsOutcome
+    # The fee line (transfer routes, 0.3.0): present only when the send confirmed
+    # a quote (POST /v1/payments with quote_id); absent on a legacy send. Same
+    # keys and meaning as :class:`FeeLine`.
+    quote_id: str
+    settlement_rail: str
+    fees_minor: dict[str, int]
+    fee_total_minor: int
+    total_debit_minor: int
+    fee_grid_version: int
 
 
 class _AccountLifecyclePayloadRequired(TypedDict):
@@ -351,6 +390,8 @@ class BeneficiaryRequestExpiredPayload(_BeneficiaryRequestExpiredRequired, total
     (B-27 contract §4). USER_PRIVATE, routed to the saver's service."""
 
     client_reference: str
+
+
 AccountKycVerifiedPayload = AccountLifecyclePayload
 AccountKycReviewRequiredPayload = AccountLifecyclePayload
 
@@ -363,7 +404,12 @@ __all__ = [
     "BeneficiaryRequestExpiredPayload",
     "DeferredTransferSentPayload",
     "DeferredTransferSettledPayload",
-    "DeferredTransferFailedPayload",
+    "DeferredTransferClosedPayload",
+    "DeferredTransferExpiredPayload",
+    "DeferredTransferCancelledPayload",
+    "PaymentInitiatedPayload",
+    "PaymentRailFailedPayload",
+    "PaymentBankStatusPayload",
     "PaymentReceivedPayload",
     "AccountLifecyclePayload",
     "AccountOpenedPayload",

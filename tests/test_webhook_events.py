@@ -79,7 +79,7 @@ _EXPECTED_BROADCASTABLE_EVENTS = {
 def test_webhook_event_catalog_matches_server_broadcastable_set():
     actual = {member.value for member in WebhookEvent}
     assert actual == _EXPECTED_BROADCASTABLE_EVENTS
-    assert len(_EXPECTED_BROADCASTABLE_EVENTS) == 18
+    assert len(_EXPECTED_BROADCASTABLE_EVENTS) == 20
 
 
 # ---------------------------------------------------------------------------
