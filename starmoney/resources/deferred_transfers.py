@@ -52,8 +52,10 @@ class DeferredTransfersResource:
         Args:
             client_transaction_id: Idempotency key. Same value always returns
                                    the same DeferredTransfer.
-            recipient_handle: Recipient phone or handle (opaque — the recipient
-                              has no account yet).
+            recipient_handle: Recipient phone number, E.164 (e.g. '+221771234567').
+                              A deferred transfer takes a phone only: an IBAN or
+                              any other handle is refused with 422 INVALID_PHONE
+                              before any hold is placed.
             amount_minor: Instruction amount in the smallest currency unit (> 0).
             currency: Currency code. Only 'XOF' is accepted.
             funding_source: 'viban_hold' (Branch A, default) or 'external_pull'
@@ -87,7 +89,9 @@ class DeferredTransfersResource:
         # The sender is the JWT sub claim: pass user_id so the request is signed
         # for that user (0.1.22; before, callers had to post raw HTTP for it).
         if user_id is not None:
-            response = await self.http.post("/deferred-transfers/send", user_id=user_id, json=payload)
+            response = await self.http.post(
+                "/deferred-transfers/send", user_id=user_id, json=payload
+            )
         else:
             response = await self.http.post("/deferred-transfers/send", json=payload)
         return response.json()
