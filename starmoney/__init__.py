@@ -91,6 +91,8 @@ from .exceptions import (
 from .webhooks.events import WebhookEvent
 from .webhooks.payloads import (
     FeeLine,
+    FeeRefundLine,
+    FeeRefundMarker,
     FundsOutcome,
     AccountKycReviewRequiredPayload,
     AccountKycVerifiedPayload,
@@ -102,6 +104,7 @@ from .webhooks.payloads import (
     DeferredTransferSentPayload,
     DeferredTransferSettledPayload,
     PaymentBankStatusPayload,
+    PaymentFeeRefundedPayload,
     PaymentInitiatedPayload,
     PaymentRailFailedPayload,
     PaymentReceivedPayload,
@@ -135,6 +138,7 @@ __all__ = [
     "PaymentInitiatedPayload",
     "PaymentRailFailedPayload",
     "PaymentBankStatusPayload",
+    "PaymentFeeRefundedPayload",
     "PaymentReceivedPayload",
     "AccountLifecyclePayload",
     "AccountOpenedPayload",
@@ -142,6 +146,8 @@ __all__ = [
     "AccountKycReviewRequiredPayload",
     "FeeLine",
     "FundsOutcome",
+    "FeeRefundMarker",
+    "FeeRefundLine",
     # Base exceptions
     "StarmoneyError",
     "APIError",

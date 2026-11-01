@@ -6,6 +6,14 @@
   `already_failed` now carry `funds` (`starmoney.FundsOutcome`) on a failed payment —
   the bank's own answer, identical to that payment's `payment.failed`. Docstrings only;
   the SDK returns the dicts unchanged.
+- **Automatic fee refund** (bank `VIBAN_FEE_REFUND_ENABLED`): new event
+  `WebhookEvent.PAYMENT_FEE_REFUNDED` (`payment.fee_refunded`) with its typed payload
+  `PaymentFeeRefundedPayload` (`fee_lines`, `fee_total_minor`, `refunded_at`), and the
+  optional `fee_refund: "pending"` (`starmoney.FeeRefundMarker`) on
+  `PaymentBankStatusPayload`. Example: Awa sends 50 000 F by RTGS (fee 1 000 F); BDK
+  accepts, then refuses an hour later: `payment.failed` with
+  `funds="debited_under_review"`, `fee_refund="pending"`, then `payment.fee_refunded`
+  with 1 000 F. Additive; subscribe to the new event to be told.
 
 ## [0.3.1] — 2026-11-01
 

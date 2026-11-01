@@ -12,8 +12,7 @@ is no cross-repo import: this SDK is published standalone to
 not depend on the server package). See ``docs/WEBHOOK_EVENTS.md`` for the full
 catalog with payload shapes, auth rules, and delivery envelope.
 
-16 broadcastable events across five domains, as of PR #101
-(``feat/transfer-notifications-3-1-3-3``).
+``payment.fee_refunded`` joined the catalog with the automatic fee refund.
 """
 
 from __future__ import annotations
@@ -39,6 +38,16 @@ class WebhookEvent(str, Enum):
     PAYMENT_FAILED = "payment.failed"
     PAYMENT_CANCELLED = "payment.cancelled"
     PAYMENT_EXPIRED = "payment.expired"
+
+    # -----------------------------------------------------------------
+    # Fee refund — sensitivity: USER_PRIVATE
+    # -----------------------------------------------------------------
+    PAYMENT_FEE_REFUNDED = "payment.fee_refunded"
+    """The fee of a quoted vIBAN send came back: BDK accepted the send, then
+    refused it (``payment.failed`` with ``funds="debited_under_review"`` and
+    ``fee_refund="pending"``), and the ledger posted the refund. Carries the
+    refunded ``fee_lines`` and ``fee_total_minor``. The principal stays under
+    review and is not part of this event. Delivered to the sending service."""
 
     # -----------------------------------------------------------------
     # UP3 Mandate audit trail — sensitivity: SERVICE_PRIVATE

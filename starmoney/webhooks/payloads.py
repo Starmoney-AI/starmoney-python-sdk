@@ -45,6 +45,21 @@ class FeeLine(TypedDict):
 # under review. One generic failed push per payment (decision D25).
 FundsOutcome = Literal["not_debited", "debited_under_review"]
 
+# ``fee_refund`` on a ``payment.failed`` reported by BDK's callback: the bank
+# refused AFTER accepting a quoted vIBAN send, so the fee that was posted with
+# the debit is being refunded automatically. ``payment.fee_refunded`` follows
+# once the ledger has posted it. Absent when no refund was queued. Closed
+# vocabulary; never renamed.
+FeeRefundMarker = Literal["pending"]
+
+
+class FeeRefundLine(TypedDict):
+    """One refunded fee line on ``payment.fee_refunded`` — the same
+    ``{code, amount_minor}`` the debit carried (``bank_fee`` / ``orchestrator_fee``)."""
+
+    code: str
+    amount_minor: int
+
 
 class WebhookMetadata(TypedDict):
     """The ``metadata`` sub-object present on every delivered webhook."""
@@ -309,6 +324,9 @@ class PaymentBankStatusPayload(_PaymentBankStatusPayloadRequired, total=False):
     # B-49: on payment.failed only — the bank had accepted, so always
     # "debited_under_review" on this path.
     funds: FundsOutcome
+    # Present (always "pending") only when the fee of a quoted vIBAN send is
+    # being refunded after the bank's refusal; payment.fee_refunded follows.
+    fee_refund: FeeRefundMarker
     # The fee line (transfer routes, 0.3.0): present only when the send confirmed
     # a quote (POST /v1/payments with quote_id); absent on a legacy send. Same
     # keys and meaning as :class:`FeeLine`.
@@ -318,6 +336,36 @@ class PaymentBankStatusPayload(_PaymentBankStatusPayloadRequired, total=False):
     fee_total_minor: int
     total_debit_minor: int
     fee_grid_version: int
+
+
+class _PaymentFeeRefundedPayloadRequired(TypedDict):
+    event_type: str  # always "payment.fee_refunded"
+    timestamp: str
+    correlation_id: str
+    transaction_id: str
+    client_transaction_id: str
+    sm_reference: str  # the payment's reference for the customer to quote
+    customer_reference: str  # the same value under its 0.2.2 name; deprecated, dropped in 0.4.0
+    user_id: str  # the sender
+    created_by_service: str
+    fee_lines: list[FeeRefundLine]  # exactly the fee lines the debit carried
+    fee_total_minor: int  # the sum of fee_lines: what went back to the sender
+    refunded_at: str  # ISO-8601 UTC
+    metadata: WebhookMetadata
+
+
+class PaymentFeeRefundedPayload(_PaymentFeeRefundedPayloadRequired, total=False):
+    """Delivered body for :attr:`WebhookEvent.PAYMENT_FEE_REFUNDED`.
+
+    The fee of a quoted vIBAN send came back: BDK accepted the send, then
+    refused it, and the ledger posted the refund. Follows a ``payment.failed``
+    with ``funds="debited_under_review"`` and ``fee_refund="pending"``. The
+    principal is NOT part of this event: it stays under review. Delivered to the
+    sending service (USER_PRIVATE, owner-routed). No balance field.
+    """
+
+    client_reference: str  # ADR-004: only present when the caller supplied one
+    deferred_transfer_id: str  # only on a deferred transfer's settle payment
 
 
 class _AccountLifecyclePayloadRequired(TypedDict):
@@ -400,6 +448,8 @@ __all__ = [
     "WebhookMetadata",
     "FeeLine",
     "FundsOutcome",
+    "FeeRefundMarker",
+    "FeeRefundLine",
     "BeneficiaryAddedPayload",
     "BeneficiaryRequestExpiredPayload",
     "DeferredTransferSentPayload",
@@ -410,6 +460,7 @@ __all__ = [
     "PaymentInitiatedPayload",
     "PaymentRailFailedPayload",
     "PaymentBankStatusPayload",
+    "PaymentFeeRefundedPayload",
     "PaymentReceivedPayload",
     "AccountLifecyclePayload",
     "AccountOpenedPayload",

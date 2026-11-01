@@ -14,6 +14,7 @@ from __future__ import annotations
 
 from starmoney.webhooks import (
     DeferredTransferSentPayload,
+    PaymentFeeRefundedPayload,
     PaymentReceivedPayload,
     WebhookEvent,
     WebhookMetadata,
@@ -42,7 +43,7 @@ def test_webhook_event_members_are_plain_strings():
 
 
 # ---------------------------------------------------------------------------
-# Full broadcastable catalog drift check (18 events, 5 domains — see
+# Full broadcastable catalog drift check (21 events, 5 domains — see
 # docs/WEBHOOK_EVENTS.md §5 in the monorepo).
 # ---------------------------------------------------------------------------
 
@@ -54,6 +55,8 @@ _EXPECTED_BROADCASTABLE_EVENTS = {
     "payment.failed",
     "payment.cancelled",
     "payment.expired",
+    # Fee refund
+    "payment.fee_refunded",
     # UP3 Mandate audit
     "payment.mandate.submitted",
     "payment.mandate.settled",
@@ -79,7 +82,7 @@ _EXPECTED_BROADCASTABLE_EVENTS = {
 def test_webhook_event_catalog_matches_server_broadcastable_set():
     actual = {member.value for member in WebhookEvent}
     assert actual == _EXPECTED_BROADCASTABLE_EVENTS
-    assert len(_EXPECTED_BROADCASTABLE_EVENTS) == 20
+    assert len(_EXPECTED_BROADCASTABLE_EVENTS) == 21
 
 
 # ---------------------------------------------------------------------------
@@ -206,3 +209,28 @@ def test_webhook_metadata_shape():
         "subscription_id": "sub-5",
     }
     assert set(meta.keys()) == {"service", "version", "subscription_id"}
+
+
+def test_payment_fee_refunded_matches_server_string():
+    assert WebhookEvent.PAYMENT_FEE_REFUNDED == "payment.fee_refunded"
+
+
+def test_payment_fee_refunded_payload_accepts_realistic_body():
+    # Awa's 50 000 F RTGS send: BDK accepted, refused an hour later; the 1 000 F
+    # fee came back.
+    body: PaymentFeeRefundedPayload = {
+        "event_type": "payment.fee_refunded",
+        "timestamp": "2026-11-01T11:05:00",
+        "correlation_id": "0f3c2d1e-9b8a-4c7d-8e6f-5a4b3c2d1e0f",
+        "transaction_id": "7d7d7d7d-0000-4000-8000-000000000001",
+        "client_transaction_id": "ctid-awa-1",
+        "sm_reference": "SM-7KQ4X-9TDB2",
+        "customer_reference": "SM-7KQ4X-9TDB2",
+        "user_id": "user-awa",
+        "created_by_service": "adita",
+        "fee_lines": [{"code": "bank_fee", "amount_minor": 1000}],
+        "fee_total_minor": 1000,
+        "refunded_at": "2026-11-01T11:05:00",
+        "metadata": {"service": "starmoney-bank-service", "version": "1.0.0", "subscription_id": "s"},
+    }
+    assert body["fee_total_minor"] == sum(line["amount_minor"] for line in body["fee_lines"])
