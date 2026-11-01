@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+- `payments.get_status(...)` and a same-cart `payments.send(...)` retry answering
+  `already_failed` now carry `funds` (`starmoney.FundsOutcome`) on a failed payment —
+  the bank's own answer, identical to that payment's `payment.failed`. Docstrings only;
+  the SDK returns the dicts unchanged.
+
 ## [0.3.1] — 2026-11-01
 
 ### The settle of a deferred transfer is a payment (bank B-15 #133, PR-D2 #179)
