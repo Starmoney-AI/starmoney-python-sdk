@@ -327,6 +327,9 @@ class PaymentBankStatusPayload(_PaymentBankStatusPayloadRequired, total=False):
     # Present (always "pending") only when the fee of a quoted vIBAN send is
     # being refunded after the bank's refusal; payment.fee_refunded follows.
     fee_refund: FeeRefundMarker
+    # Beside fee_refund only: the fee being refunded, whole XOF (the sum of
+    # the debit's fee lines; equals fee_total_minor on payment.fee_refunded).
+    fee_refund_minor: int
     # The fee line (transfer routes, 0.3.0): present only when the send confirmed
     # a quote (POST /v1/payments with quote_id); absent on a legacy send. Same
     # keys and meaning as :class:`FeeLine`.

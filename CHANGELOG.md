@@ -9,11 +9,11 @@
 - **Automatic fee refund** (bank `VIBAN_FEE_REFUND_ENABLED`): new event
   `WebhookEvent.PAYMENT_FEE_REFUNDED` (`payment.fee_refunded`) with its typed payload
   `PaymentFeeRefundedPayload` (`fee_lines`, `fee_total_minor`, `refunded_at`), and the
-  optional `fee_refund: "pending"` (`starmoney.FeeRefundMarker`) on
-  `PaymentBankStatusPayload`. Example: Awa sends 50 000 F by RTGS (fee 1 000 F); BDK
+  optional `fee_refund: "pending"` (`starmoney.FeeRefundMarker`) and `fee_refund_minor`
+  (the fee being refunded, whole XOF) on `PaymentBankStatusPayload`. Example: Awa sends 50 000 F by RTGS (fee 2 500 F); BDK
   accepts, then refuses an hour later: `payment.failed` with
-  `funds="debited_under_review"`, `fee_refund="pending"`, then `payment.fee_refunded`
-  with 1 000 F. Additive; subscribe to the new event to be told.
+  `funds="debited_under_review"`, `fee_refund="pending"`, `fee_refund_minor=2500`, then `payment.fee_refunded`
+  with 2 500 F. Additive; subscribe to the new event to be told.
 
 ## [0.3.1] — 2026-11-01
 
