@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- `accounts.get_user_available_rails(...)`: each rail now carries `account` (`display_name`, `account_reference`, `account_reference_masked`) when linked, else `None` (B-58). Docstring only; the SDK returns the dict unchanged.
+
 ## [0.3.2] — 2026-11-01
 
 - `payments.get_status(...)` and a same-cart `payments.send(...)` retry answering
