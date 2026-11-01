@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.3.2] — 2026-11-01
+
 - `payments.get_status(...)` and a same-cart `payments.send(...)` retry answering
   `already_failed` now carry `funds` (`starmoney.FundsOutcome`) on a failed payment —
   the bank's own answer, identical to that payment's `payment.failed`. Docstrings only;
