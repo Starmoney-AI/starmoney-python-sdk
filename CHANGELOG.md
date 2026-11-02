@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+- `beneficiaries.list(...)` pending items carry `held_total_minor`, `held_count`,
+  `earliest_expires_at`, `latest_expires_at` (what your RESERVED deferred transfers to that
+  number add up to; `0` / `0` / `None` / `None` when nothing waits, `None` on ready items).
+  New TypedDict `PendingPayeeHeld` in `starmoney.resources.beneficiaries`. Additive.
+
 ## [0.3.2] — 2026-11-01
 
 - `payments.get_status(...)` and a same-cart `payments.send(...)` retry answering
