@@ -16,6 +16,7 @@ from .payloads import (
     PaymentInitiatedPayload,
     PaymentRailFailedPayload,
     PaymentReceivedPayload,
+    PaymentReversedPayload,
     WebhookMetadata,
 )
 from .validator import WebhookValidator
@@ -34,6 +35,7 @@ __all__ = [
     "PaymentBankStatusPayload",
     "PaymentFeeRefundedPayload",
     "PaymentReceivedPayload",
+    "PaymentReversedPayload",
     "AccountLifecyclePayload",
     "AccountOpenedPayload",
     "AccountKycVerifiedPayload",

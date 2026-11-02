@@ -15,6 +15,7 @@ from __future__ import annotations
 from starmoney.webhooks import (
     DeferredTransferSentPayload,
     PaymentFeeRefundedPayload,
+    PaymentReversedPayload,
     PaymentReceivedPayload,
     WebhookEvent,
     WebhookMetadata,
@@ -43,7 +44,7 @@ def test_webhook_event_members_are_plain_strings():
 
 
 # ---------------------------------------------------------------------------
-# Full broadcastable catalog drift check (21 events, 5 domains — see
+# Full broadcastable catalog drift check (22 events, 5 domains — see
 # docs/WEBHOOK_EVENTS.md §5 in the monorepo).
 # ---------------------------------------------------------------------------
 
@@ -57,6 +58,8 @@ _EXPECTED_BROADCASTABLE_EVENTS = {
     "payment.expired",
     # Fee refund
     "payment.fee_refunded",
+    # Principal returned
+    "payment.reversed",
     # UP3 Mandate audit
     "payment.mandate.submitted",
     "payment.mandate.settled",
@@ -82,7 +85,7 @@ _EXPECTED_BROADCASTABLE_EVENTS = {
 def test_webhook_event_catalog_matches_server_broadcastable_set():
     actual = {member.value for member in WebhookEvent}
     assert actual == _EXPECTED_BROADCASTABLE_EVENTS
-    assert len(_EXPECTED_BROADCASTABLE_EVENTS) == 21
+    assert len(_EXPECTED_BROADCASTABLE_EVENTS) == 22
 
 
 # ---------------------------------------------------------------------------
@@ -234,3 +237,41 @@ def test_payment_fee_refunded_payload_accepts_realistic_body():
         "metadata": {"service": "starmoney-bank-service", "version": "1.0.0", "subscription_id": "s"},
     }
     assert body["fee_total_minor"] == sum(line["amount_minor"] for line in body["fee_lines"])
+
+
+def test_payment_reversed_matches_server_string():
+    assert WebhookEvent.PAYMENT_REVERSED == "payment.reversed"
+
+
+def test_payment_reversed_payload_accepts_realistic_body():
+    # Awa's 50 000 F RTGS send: refused after acceptance, the 2 500 F fee came back
+    # first (payment.fee_refunded), then BDK returned the 50 000 F.
+    body: PaymentReversedPayload = {
+        "event_type": "payment.reversed",
+        "timestamp": "2026-11-03T09:00:00",
+        "correlation_id": "0f3c2d1e-9b8a-4c7d-8e6f-5a4b3c2d1e0f",
+        "transaction_id": "7d7d7d7d-0000-4000-8000-000000000001",
+        "client_transaction_id": "ctid-awa-1",
+        "sm_reference": "SM-7KQ4X-9TDB2",
+        "customer_reference": "SM-7KQ4X-9TDB2",
+        "user_id": "user-awa",
+        "created_by_service": "adita",
+        "currency": "XOF",
+        "prior_status": "failed",
+        "reason": "rail_rejected_after_acceptance",
+        "amount_minor": 50000,
+        "fee_returned_minor": 0,
+        "fee_refunded_earlier": True,
+        "returned_at": "2026-11-03T09:00:00",
+        "metadata": {"service": "starmoney-bank-service", "version": "1.0.0", "subscription_id": "s"},
+    }
+    assert body["fee_refunded_earlier"] and body["fee_returned_minor"] == 0
+    assert "balance" not in body
+
+
+def test_funds_outcome_has_the_returned_value():
+    from typing import get_args
+
+    from starmoney import FundsOutcome
+
+    assert set(get_args(FundsOutcome)) == {"not_debited", "debited_under_review", "returned"}

@@ -12,7 +12,8 @@ is no cross-repo import: this SDK is published standalone to
 not depend on the server package). See ``docs/WEBHOOK_EVENTS.md`` for the full
 catalog with payload shapes, auth rules, and delivery envelope.
 
-``payment.fee_refunded`` joined the catalog with the automatic fee refund.
+``payment.fee_refunded`` joined the catalog with the automatic fee refund;
+``payment.reversed`` with the return of a refused send's principal (B-75).
 """
 
 from __future__ import annotations
@@ -48,6 +49,17 @@ class WebhookEvent(str, Enum):
     ``fee_refund="pending"``), and the ledger posted the refund. Carries the
     refunded ``fee_lines`` and ``fee_total_minor``. The principal stays under
     review and is not part of this event. Delivered to the sending service."""
+
+    # -----------------------------------------------------------------
+    # Principal returned (B-75) — sensitivity: USER_PRIVATE
+    # -----------------------------------------------------------------
+    PAYMENT_REVERSED = "payment.reversed"
+    """The bank returned the principal of a send it had refused after accepting
+    it (``payment.failed`` with ``funds="debited_under_review"``), and the ledger
+    booked the return. Carries ``amount_minor`` (the principal), the fee brought
+    back by this event (``fee_returned_minor``, 0 when ``payment.fee_refunded``
+    already returned it) and ``fee_refunded_earlier``. Delivered to the sending
+    service."""
 
     # -----------------------------------------------------------------
     # UP3 Mandate audit trail — sensitivity: SERVICE_PRIVATE

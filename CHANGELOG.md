@@ -7,6 +7,11 @@
   number add up to; `0` / `0` / `None` / `None` when nothing waits, `None` on ready items).
   New TypedDict `PendingPayeeHeld` in `starmoney.resources.beneficiaries`. Additive.
 
+## [0.3.3] — 2026-11-03
+
+- **Principal returned (bank B-75)**: new event `WebhookEvent.PAYMENT_REVERSED` (`payment.reversed`) with its typed payload `PaymentReversedPayload` (`currency`, `prior_status`, `reason`, `amount_minor`, `fee_returned_minor`, `fee_refunded_earlier`, `returned_at`), and `starmoney.FundsOutcome` gains `"returned"` (read side only: `payments.get_status` and an `already_failed` retry). Example: Awa's 50 000 F RTGS send is refused after acceptance (`payment.failed`, `funds="debited_under_review"`), the 2 500 F fee comes back (`payment.fee_refunded`), two days later the bank returns the 50 000 F: `payment.reversed` with `amount_minor=50000`, `fee_returned_minor=0`, `fee_refunded_earlier=True`. Additive; subscribe to the new event to be told.
+- `accounts.get_user_available_rails(...)`: each rail now carries `account` (`display_name`, `account_reference`, `account_reference_masked`) when linked, else `None` (B-58). Docstring only; the SDK returns the dict unchanged.
+
 ## [0.3.2] — 2026-11-01
 
 - `payments.get_status(...)` and a same-cart `payments.send(...)` retry answering
