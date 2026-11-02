@@ -1,9 +1,10 @@
 """StarMoney SDK - Accounts Resource"""
 
-from datetime import datetime
-from typing import Any, Dict, Optional
+from datetime import date, datetime
+from typing import Any, Dict, Optional, Union
 
 from ..http_client import HTTPClient
+from ..transfer_history import TransferHistoryPage
 
 
 class AccountsResource:
@@ -126,22 +127,58 @@ class AccountsResource:
         response = await self.http.post(f"/accounts/rails/{rail_name}", user_id=user_id)
         return response.json()
 
-    async def get_transfer_history(self, user_id: str, limit: int = 20, offset: int = 0) -> Dict[str, Any]:
+    async def get_transfer_history(
+        self,
+        user_id: str,
+        limit: int = 20,
+        offset: int = 0,
+        *,
+        cursor: Optional[str] = None,
+        from_date: Optional[Union[date, str]] = None,
+        to_date: Optional[Union[date, str]] = None,
+    ) -> TransferHistoryPage:
         """
-        Retrieve the authenticated user's transfer history.
+        Retrieve the authenticated user's transfer history, both directions in
+        ONE list, newest first.
+
+        Each row carries ``direction``: ``"out"`` (a send) or ``"in"`` (an
+        inbound credit on the holder's vIBAN, read live from the vIBAN ledger;
+        StarMoney stores nothing about it). A holder without a vIBAN gets
+        ``out`` rows only. Every row has ``id``, ``direction``, ``amount_minor``,
+        ``currency``, ``status``, ``date``, ``account_reference`` /
+        ``account_label`` (the holder's own vIBAN, "Compte StarMoney"),
+        ``counterparty_name``, ``counterparty_iban``, ``motif`` and
+        ``sm_reference`` (+ ``customer_reference``, same value). ``out`` rows
+        keep every field they always had (``transaction_id``,
+        ``client_transaction_id``, ``recipient_iban``, the fee line, ...).
+        See :class:`starmoney.transfer_history.TransferHistoryRow`.
+
+        Example: Awa sends Moussa 5 000 F in-network. Moussa's history has one
+        ``in`` row (``counterparty_name="Awa"``, ``sm_reference`` = Awa's,
+        ``motif`` = the transfer's wording); Awa's has one ``out`` row.
 
         Args:
             user_id: User ID to retrieve transfer history for
-            limit: number of transfers to return (default 20)
-            offset: pagination offset (default 0)
+            limit: number of rows to return (default 20, max 100)
+            offset: legacy paging: skips this many rows of the MERGED list
+                (ignored when ``cursor`` is given; capped at a ~1000-row window,
+                beyond which the server answers INVALID_CURSOR). Prefer ``cursor``.
+            cursor: the ``next_cursor`` of the previous page, passed back
+                unchanged (opaque).
+            from_date: first day to include (``date`` or ``"YYYY-MM-DD"``, UTC).
+            to_date: last day to include (inclusive, same format).
 
         Returns:
-            Parsed JSON response with transfers, limit, offset and user_id
-            Each transfer carries transaction_id, client_transaction_id (your
-            own id, as sent) and customer_reference (StarMoney's reference for
-            the customer to see and quote, e.g. 'SM-7KQ4X-9TDB2').
+            The page: ``user_id``, ``transfers``, ``limit``, ``offset`` and
+            ``next_cursor`` (None at the end of the list).
         """
-        params = {"limit": limit, "offset": offset}
+        params: Dict[str, Any] = {"limit": limit, "offset": offset}
+        if cursor is not None:
+            params["cursor"] = cursor
+        if from_date is not None:
+            params["from"] = from_date.isoformat() if isinstance(from_date, date) else from_date
+        if to_date is not None:
+            params["to"] = to_date.isoformat() if isinstance(to_date, date) else to_date
         response = await self.http.get("/accounts/transfers", params=params, user_id=user_id)
         return response.json()
 
