@@ -5,12 +5,44 @@ GET /v1/deferred-transfers/{id}, POST /v1/deferred-transfers/{id}/claim,
 POST /v1/deferred-transfers/{id}/cancel.
 """
 
-from typing import TYPE_CHECKING, Any, Literal, Optional
+from typing import TYPE_CHECKING, Any, Literal, Optional, TypedDict
 
 from ..http_client import HTTPClient
 
 if TYPE_CHECKING:  # pragma: no cover
     from ..up3.resource import UP3Resource
+
+DeferredFundingSource = Literal["viban_hold", "external_pull"]
+
+
+class _DeferredTransferAccountFields(TypedDict):
+    """Fields shared by a list row and the single read (B-56)."""
+
+    funding_source: DeferredFundingSource  # same words as the send request
+    sender_account_reference: Optional[str]  # null for external_pull
+    # The recipient's account, in full (as on deferred_transfer.settled); null until
+    # claimed. Mask it for display.
+    recipient_account_reference: Optional[str]
+
+
+class DeferredTransferListItem(_DeferredTransferAccountFields):
+    """One row of ``deferred_transfers.list(...)["deferred_transfers"]``."""
+
+    deferred_transfer_id: str
+    sm_reference: str
+    customer_reference: str  # deprecated, dropped in 0.4.0
+    client_transaction_id: str
+    recipient_handle: str  # MASKED
+    amount_minor: int
+    currency: str
+    status: str
+    created_at: str
+    expires_at: Optional[str]
+
+
+class DeferredTransferRead(_DeferredTransferAccountFields):
+    """Account fields added to ``deferred_transfers.get(...)`` (B-56); the other
+    keys of the response are unchanged."""
 
 
 class DeferredTransfersResource:
@@ -294,7 +326,11 @@ class DeferredTransfersResource:
               deferred_transfer_id, sm_reference (customer_reference until 0.4.0),
               client_transaction_id,
               recipient_handle (MASKED, e.g. '+2217xxxxxx99'),
-              amount_minor, currency, status, created_at, expires_at.
+              amount_minor, currency, status, created_at, expires_at,
+              funding_source ('viban_hold' | 'external_pull'),
+              sender_account_reference (null for external_pull),
+              recipient_account_reference (full, null until claimed; mask it).
+              See :class:`DeferredTransferListItem`.
 
         Raises:
             ValidationError (422): Unknown status token in the filter.
@@ -316,7 +352,9 @@ class DeferredTransfersResource:
             deferred_transfer_id: UUID of the deferred transfer.
 
         Returns:
-            DeferredTransferResponse dict.
+            DeferredTransferResponse dict, with ``funding_source``,
+            ``sender_account_reference`` and ``recipient_account_reference``
+            (:class:`DeferredTransferRead`).
 
         Raises:
             PaymentNotFoundError (404): Transfer not found.
