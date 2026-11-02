@@ -43,7 +43,10 @@ class FeeLine(TypedDict):
 # ``funds`` on ``payment.failed`` (B-49, 0.3.0) — closed vocabulary, never
 # renamed: the sender's money was not taken, or it was and the books are
 # under review. One generic failed push per payment (decision D25).
-FundsOutcome = Literal["not_debited", "debited_under_review"]
+# ``returned`` (B-75) is read-side only (``payments.get_status`` and an
+# ``already_failed`` retry): the bank returned the principal of a refused send
+# and ``payment.reversed`` was sent; ``payment.failed`` itself never carries it.
+FundsOutcome = Literal["not_debited", "debited_under_review", "returned"]
 
 # ``fee_refund`` on a ``payment.failed`` reported by BDK's callback: the bank
 # refused AFTER accepting a quoted vIBAN send, so the fee that was posted with
@@ -365,6 +368,42 @@ class PaymentFeeRefundedPayload(_PaymentFeeRefundedPayloadRequired, total=False)
     with ``funds="debited_under_review"`` and ``fee_refund="pending"``. The
     principal is NOT part of this event: it stays under review. Delivered to the
     sending service (USER_PRIVATE, owner-routed). No balance field.
+    """
+
+    client_reference: str  # ADR-004: only present when the caller supplied one
+    deferred_transfer_id: str  # only on a deferred transfer's settle payment
+
+
+class _PaymentReversedPayloadRequired(TypedDict):
+    event_type: str  # always "payment.reversed"
+    timestamp: str
+    correlation_id: str
+    transaction_id: str
+    client_transaction_id: str
+    sm_reference: str  # the payment's reference for the customer to quote
+    customer_reference: str  # the same value under its 0.2.2 name; deprecated, dropped in 0.4.0
+    user_id: str  # the sender
+    created_by_service: str
+    currency: str  # e.g. "XOF"
+    prior_status: str  # always "failed" today
+    reason: str  # always "rail_rejected_after_acceptance" today
+    amount_minor: int  # the principal returned to the sender, whole XOF
+    fee_returned_minor: int  # the fee THIS event brings back; 0 if payment.fee_refunded did
+    fee_refunded_earlier: bool  # True when payment.fee_refunded already returned the fee
+    returned_at: str  # ISO-8601 UTC
+    metadata: WebhookMetadata
+
+
+class PaymentReversedPayload(_PaymentReversedPayloadRequired, total=False):
+    """Delivered body for :attr:`WebhookEvent.PAYMENT_REVERSED`.
+
+    Awa's 50 000 F RTGS send was accepted by the bank (her account was debited
+    52 500 F with the 2 500 F fee), then refused: ``payment.failed`` with
+    ``funds="debited_under_review"``, then ``payment.fee_refunded``. Two days
+    later the bank returns the 50 000 F and the ledger books it: this event, with
+    ``amount_minor=50000``, ``fee_returned_minor=0``, ``fee_refunded_earlier=True``.
+    Delivered to the sending service (USER_PRIVATE, owner-routed). No balance
+    field, no operator name, no bank reference.
     """
 
     client_reference: str  # ADR-004: only present when the caller supplied one
