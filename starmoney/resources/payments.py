@@ -86,8 +86,9 @@ class PaymentsResource:
             ``total_debit_minor`` and ``fee_grid_version`` (null on a legacy send).
             A same-cart retry answering ``already_failed`` carries ``funds``
             (:data:`starmoney.FundsOutcome`, since 0.3.2): ``not_debited`` or
-            ``debited_under_review``, the same answer as that payment's
-            ``payment.failed``. Null on every other status.
+            ``debited_under_review`` or, once the bank has returned the principal
+            and ``payment.reversed`` was sent, ``returned``. Otherwise the
+            same answer as that payment's ``payment.failed``. Null on every other status.
 
         Raises:
             InvalidIBANError (422): beneficiary_iban failed format or mod-97 —
@@ -235,8 +236,10 @@ class PaymentsResource:
               (since 0.2.3), and ``funds`` (since 0.3.2) on a failed or
               cancelled payment: ``not_debited`` (BDK never accepted; any hold
               released) or ``debited_under_review`` (BDK had accepted, the
-              money is not back yet). The bank decides; same answer as the
-              payment's ``payment.failed``. Null otherwise.
+              money is not back yet) or ``returned`` (the bank returned the
+              principal; ``payment.reversed`` was sent). The bank decides;
+              otherwise the same answer as the payment's ``payment.failed``.
+              Null otherwise.
         """
         response = await self.http.get(f"/payments/status/{client_transaction_id}", user_id=user_id)
         return response.json()
