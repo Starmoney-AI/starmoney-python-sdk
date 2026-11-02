@@ -32,7 +32,8 @@ class _TransferHistoryRowBase(TypedDict):
     # in: who paid, when known (an in-network sender's first name; None for an
     # external credit). out: the recipient's name.
     counterparty_name: Optional[str]
-    # in: always None for now (not yet ruled). out: the recipient IBAN.
+    # in: the in-network sender's vIBAN (None for an external credit or a sender
+    # paying from a linked BDK account). out: the recipient IBAN.
     counterparty_iban: Optional[str]
     motif: Optional[str]  # in: the inbound libelle. out: the description
     # The reference both parties quote ('SM-7KQ4X-9TDB2'). On an in row: the
