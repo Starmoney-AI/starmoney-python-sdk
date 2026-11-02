@@ -88,6 +88,7 @@ from .exceptions import (
     UP3StatusInvalid,
     UP3TypeNotAccepted,
 )
+from .resources.recipients import RecipientCheck
 from .webhooks.events import WebhookEvent
 from .webhooks.payloads import (
     FeeLine,
@@ -145,6 +146,7 @@ __all__ = [
     "AccountKycVerifiedPayload",
     "AccountKycReviewRequiredPayload",
     "FeeLine",
+    "RecipientCheck",
     "FundsOutcome",
     "FeeRefundMarker",
     "FeeRefundLine",

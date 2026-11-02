@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+- New `client.recipients.check(user_id, phone)` (bank `GET /v1/recipients/check`, B-41) returning a
+  `RecipientCheck` TypedDict `{creditable, self, execute_before_max}`. A bad number raises
+  `InvalidPhoneError` (422), the per-user hourly cap raises `RateLimitError` (429
+  `RECIPIENT_CHECK_LIMIT_REACHED`). Example: ask before the review screen whether Moussa's number can
+  be credited right now.
+
 ## [0.3.2] — 2026-11-01
 
 - `payments.get_status(...)` and a same-cart `payments.send(...)` retry answering
