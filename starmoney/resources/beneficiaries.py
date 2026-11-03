@@ -1,10 +1,25 @@
 """StarMoney SDK - Beneficiaries Resource"""
 
-from typing import Any, Optional
+from typing import Any, Optional, TypedDict
 
 from .._iban import is_valid_iban
 from ..exceptions import InvalidIBANError
 from ..http_client import HTTPClient
+
+
+class PendingPayeeHeld(TypedDict):
+    """Fields added to a PENDING item of ``beneficiaries.list(...)`` (B-46).
+
+    What the caller's own RESERVED deferred transfers to that number add up to,
+    derived at read time: ``0`` / ``0`` / ``None`` / ``None`` when nothing waits.
+    On ready (IBAN) items all four are ``None``. A per-payee total of transfers
+    in flight, never a balance. Datetimes arrive as ISO-8601 strings.
+    """
+
+    held_total_minor: Optional[int]
+    held_count: Optional[int]
+    earliest_expires_at: Optional[str]
+    latest_expires_at: Optional[str]
 
 
 class BeneficiariesResource:
@@ -114,7 +129,10 @@ class BeneficiariesResource:
             page_size: Items per page (max 100, default 50).
             include_inactive: If True, include soft-deleted beneficiaries.
             status: "all" (default) | "active" | "pending". Pending items (B-27)
-                have iban None and carry beneficiary_request_id + expires_at.
+                have iban None and carry beneficiary_request_id + expires_at,
+                plus held_total_minor / held_count / earliest_expires_at /
+                latest_expires_at (B-46, :class:`PendingPayeeHeld`): what your
+                RESERVED deferred transfers to that number add up to.
 
         Returns:
             BeneficiaryListResponse dict with keys:

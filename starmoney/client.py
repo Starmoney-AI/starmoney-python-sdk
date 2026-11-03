@@ -13,6 +13,7 @@ from .resources.beneficiaries import BeneficiariesResource
 from .resources.beneficiary_requests import BeneficiaryRequestsResource
 from .resources.deferred_transfers import DeferredTransfersResource
 from .resources.payments import PaymentsResource
+from .resources.recipients import RecipientsResource
 from .resources.webhooks import WebhooksResource
 from .up3.resource import UP3Resource
 
@@ -118,6 +119,7 @@ class StarmoneyClient:
         self._payments: Optional[PaymentsResource] = None
         self._deferred_transfers: Optional[DeferredTransfersResource] = None
         self._beneficiary_requests: Optional[BeneficiaryRequestsResource] = None
+        self._recipients: Optional[RecipientsResource] = None
         self._webhooks: Optional[WebhooksResource] = None
 
     @property
@@ -133,6 +135,13 @@ class StarmoneyClient:
         if self._beneficiary_requests is None:
             self._beneficiary_requests = BeneficiaryRequestsResource(self._http_client)
         return self._beneficiary_requests
+
+    @property
+    def recipients(self) -> RecipientsResource:
+        """Recipient check: can this phone be credited right now? (bank B-41)"""
+        if self._recipients is None:
+            self._recipients = RecipientsResource(self._http_client)
+        return self._recipients
 
     @property
     def beneficiaries(self) -> BeneficiariesResource:
