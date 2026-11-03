@@ -7,6 +7,14 @@
   number add up to; `0` / `0` / `None` / `None` when nothing waits, `None` on ready items).
   New TypedDict `PendingPayeeHeld` in `starmoney.resources.beneficiaries`. Additive.
 
+- New `client.recipients.check(user_id, phone)` (bank `GET /v1/recipients/check`, B-41) returning a
+  `RecipientCheck` TypedDict `{creditable, self, execute_before_max}`. A bad number raises
+  `InvalidPhoneError` (422), the per-user hourly cap raises `RateLimitError` (429
+  `RECIPIENT_CHECK_LIMIT_REACHED`). Example: ask before the review screen whether Moussa's number can
+  be credited right now.
+
+- No SDK code change (the SDK never validated IBAN lengths): the service now refuses a 27-character Senegal IBAN with the existing `InvalidIBANError` (422), because Senegal IBANs are 28 characters (bank B-53). Example: `beneficiaries.create(iban="SN85K0010015200041629122706")` raises `InvalidIBANError`; Awa's renamed 28-character vIBAN `SN18K00100152000041629122706` is accepted. Test fixtures now use 28-character IBANs.
+
 ## [0.3.4] — 2026-11-03
 
 - `accounts.get_transfer_history(...)` returns the merged in + out list (bank B-59): new keyword arguments `cursor`, `from_date`, `to_date` (a `date` or `"YYYY-MM-DD"`), and the page carries `next_cursor`. Every row gains `direction` (`"in"` | `"out"`), `amount_minor`, `status`, `date`, `account_reference` / `account_label`, `counterparty_name`, `counterparty_iban` (on an `in` row: the in-network sender's vIBAN, null for an external credit), `motif`, `deferred_transfer_id` (on an `out` row that settles a phone transfer: that transfer's id, else null) (+ `id` always present); `out` rows keep all their fields. Typed as `starmoney.TransferHistoryPage` / `TransferHistoryRow` / `TransferDirection`. `offset` still works (skips rows of the merged list; prefer the cursor). Additive.

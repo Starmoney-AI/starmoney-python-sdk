@@ -291,7 +291,7 @@ async def test_resolve_self_calls_the_user_scoped_path():
         "account_state": "active_pre_kyc",
         "accounts": [
             {
-                "account_reference": "SN12K0010015200002569000754",
+                "account_reference": "SN12K00100152000025690007542",
                 "viban_tenant_slug": "sandbox",
                 "currency": "XOF",
                 "provisioning_state": "active",
