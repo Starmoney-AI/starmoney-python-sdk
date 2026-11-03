@@ -89,6 +89,7 @@ from .exceptions import (
     UP3TypeNotAccepted,
 )
 from .resources.recipients import RecipientCheck
+from .transfer_history import TransferDirection, TransferHistoryPage, TransferHistoryRow
 from .webhooks.events import WebhookEvent
 from .webhooks.payloads import (
     FeeLine,
@@ -152,6 +153,9 @@ __all__ = [
     "FundsOutcome",
     "FeeRefundMarker",
     "FeeRefundLine",
+    "TransferDirection",
+    "TransferHistoryPage",
+    "TransferHistoryRow",
     # Base exceptions
     "StarmoneyError",
     "APIError",
