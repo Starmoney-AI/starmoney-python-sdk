@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.3.4] — 2026-11-03
+
 - `accounts.get_transfer_history(...)` returns the merged in + out list (bank B-59): new keyword arguments `cursor`, `from_date`, `to_date` (a `date` or `"YYYY-MM-DD"`), and the page carries `next_cursor`. Every row gains `direction` (`"in"` | `"out"`), `amount_minor`, `status`, `date`, `account_reference` / `account_label`, `counterparty_name`, `counterparty_iban` (on an `in` row: the in-network sender's vIBAN, null for an external credit), `motif`, `deferred_transfer_id` (on an `out` row that settles a phone transfer: that transfer's id, else null) (+ `id` always present); `out` rows keep all their fields. Typed as `starmoney.TransferHistoryPage` / `TransferHistoryRow` / `TransferDirection`. `offset` still works (skips rows of the merged list; prefer the cursor). Additive.
 
 ## [0.3.3] — 2026-11-03
