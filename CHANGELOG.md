@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+## [0.3.5] — 2026-11-03
+
+- `deferred_transfers.list(...)` rows and `deferred_transfers.get(...)` carry `funding_source` (`"viban_hold"` | `"external_pull"`), `sender_account_reference` (None for external_pull) and `recipient_account_reference` (full, None until claimed; mask it) (bank B-56). Typed as `DeferredTransferListItem` / `DeferredTransferRead` / `DeferredFundingSource` in `starmoney.resources.deferred_transfers`. Additive.
+
 - `beneficiaries.list(...)` pending items carry `held_total_minor`, `held_count`,
   `earliest_expires_at`, `latest_expires_at` (what your RESERVED deferred transfers to that
   number add up to; `0` / `0` / `None` / `None` when nothing waits, `None` on ready items).
