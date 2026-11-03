@@ -40,6 +40,9 @@ class _TransferHistoryRowBase(TypedDict):
     # sender's, when the libelle carries it; None on a credit that predates it.
     sm_reference: Optional[str]
     customer_reference: Optional[str]  # same value as sm_reference, until 0.4.0
+    # out: the phone transfer this payment settles (bank B-15), else None; lets a
+    # caller that also lists deferred transfers show the pair once. in: None.
+    deferred_transfer_id: Optional[str]
 
 
 class TransferHistoryRow(_TransferHistoryRowBase, total=False):
