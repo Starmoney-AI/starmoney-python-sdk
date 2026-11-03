@@ -241,7 +241,12 @@ class AccountsResource:
         Returns:
             Parsed JSON response containing:
             - user_id: The user's ID
-            - available_rails: List of rails with name, display info, and credential status
+            - available_rails: List of rails with name, display info, and credential status.
+              Each item carries ``account``: ``{"display_name", "account_reference", "account_reference_masked"}``
+              when an account is linked on that rail (e.g. ``{"display_name": "BDK",
+              "account_reference": None, "account_reference_masked": None}``), else ``None`` — grey that row out.
+              both references stay ``None`` until the IBAN is captured at
+              linking (later release); never a balance.
             - total_rails: Total number of rails
             - configured_rails: Number of rails with stored credentials
 
@@ -249,7 +254,7 @@ class AccountsResource:
             ```python
             rails = await client.accounts.get_user_available_rails(user_id)
             for rail in rails["available_rails"]:
-                print(f"{rail['name']}: {rail['has_credentials']}")
+                print(f"{rail['rail_name']}: {rail['has_credentials']}")
             ```
         """
         response = await self.http.get("/accounts/rails", user_id=user_id)

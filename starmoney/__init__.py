@@ -109,6 +109,7 @@ from .webhooks.payloads import (
     PaymentInitiatedPayload,
     PaymentRailFailedPayload,
     PaymentReceivedPayload,
+    PaymentReversedPayload,
 )
 from .webhooks.validator import WebhookValidator
 
@@ -141,6 +142,7 @@ __all__ = [
     "PaymentBankStatusPayload",
     "PaymentFeeRefundedPayload",
     "PaymentReceivedPayload",
+    "PaymentReversedPayload",
     "AccountLifecyclePayload",
     "AccountOpenedPayload",
     "AccountKycVerifiedPayload",
