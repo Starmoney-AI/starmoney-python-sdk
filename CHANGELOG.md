@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- No SDK code change (the SDK never validated IBAN lengths): the service now refuses a 27-character Senegal IBAN with the existing `InvalidIBANError` (422), because Senegal IBANs are 28 characters (bank B-53). Example: `beneficiaries.create(iban="SN85K0010015200041629122706")` raises `InvalidIBANError`; Awa's renamed 28-character vIBAN `SN18K00100152000041629122706` is accepted. Test fixtures now use 28-character IBANs.
+
 ## [0.3.3] — 2026-11-03
 
 - **Principal returned (bank B-75)**: new event `WebhookEvent.PAYMENT_REVERSED` (`payment.reversed`) with its typed payload `PaymentReversedPayload` (`currency`, `prior_status`, `reason`, `amount_minor`, `fee_returned_minor`, `fee_refunded_earlier`, `returned_at`), and `starmoney.FundsOutcome` gains `"returned"` (read side only: `payments.get_status` and an `already_failed` retry). Example: Awa's 50 000 F RTGS send is refused after acceptance (`payment.failed`, `funds="debited_under_review"`), the 2 500 F fee comes back (`payment.fee_refunded`), two days later the bank returns the 50 000 F: `payment.reversed` with `amount_minor=50000`, `fee_returned_minor=0`, `fee_refunded_earlier=True`. Additive; subscribe to the new event to be told.
