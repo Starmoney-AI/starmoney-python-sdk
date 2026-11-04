@@ -2,6 +2,7 @@
 
 ## [Unreleased]
 
+- `PaymentReceivedPayload` gains `sender_payee_id` / `sender_payee_name` (bank B-79; always sent, so typed like `sender_name`; read with `.get()` against an older bank): the recipient's own saved payee for the sender and its current name; `None` when unknown. `TransferHistoryRow.payee_id` / `payee_name` are now also set on `in` rows (the holder's payee for the payer's IBAN). Additive. Example: Awa saved Djo's account as «Djo»; Djo («Souleymane») sends her 2 000 XOF; `payment.received` has `sender_name="Souleymane"`, `sender_payee_name="Djo"`, and your bot decides which to show.
 - `client.payments.get_mandates(user_id, cart_id)` (bank B-37) returns the typed `StoredMandates` (`status` `"stored"` or `"abandoned"`, `intent`, `cart`, `payment_mandates`, `money_status`, `abandoned_at`); a cart the bank never stored raises `PaymentNotFoundError` (404, `error_code` `RESOURCE_NOT_FOUND`). `client.payments.abandon_cart(user_id, cart_id)` (bank B-35) returns `CartAbandonment` (idempotent), and raises `UP3Replay` when the bank already stored the cart. A late `send_with_mandates` of an abandoned cart raises the new `UP3CartAbandoned` (`UP3_CART_ABANDONED`, 409). Example: Awa's 5 000 XOF send to Moussa times out at 12:05:30; `get_mandates(...)` raises `PaymentNotFoundError`, `abandon_cart(...)` returns, adita tells Awa nothing left her account, and the same send arriving late is refused with `UP3CartAbandoned`.
 
 ## [0.3.6] — 2026-11-04
