@@ -13,6 +13,7 @@ import pytest
 from starmoney.exceptions import (
     DuplicateResourceError,
     UP3Error,
+    UP3CartAbandoned,
     UP3ExecutionModeMismatch,
     UP3Expired,
     UP3IssuerMismatch,
@@ -47,6 +48,7 @@ def test_mandate_required_409_is_a_up3_refusal_not_a_duplicate():
         (409, "UP3_ISSUER_MISMATCH", UP3IssuerMismatch),
         (409, "UP3_REPLAY", UP3Replay),
         (409, "UP3_EXECUTION_MODE_MISMATCH", UP3ExecutionModeMismatch),
+        (409, "UP3_CART_ABANDONED", UP3CartAbandoned),
         (410, "UP3_EXPIRED", UP3Expired),
         (422, "UP3_TYPE_REQUIRED_MISSING", UP3TypeRequiredMissing),
     ],
@@ -58,8 +60,8 @@ def test_known_up3_codes_map_to_their_class(status, code, cls):
 
 def test_an_unknown_up3_code_is_still_a_up3_error_with_the_code_set():
     with pytest.raises(UP3Error) as exc_info:
-        _handle(409, {"detail": "UP3_CART_ABANDONED: the cart was abandoned"})
-    assert exc_info.value.code == "UP3_CART_ABANDONED"
+        _handle(409, {"detail": "UP3_FUTURE_CODE: a code a newer verifier adds"})
+    assert exc_info.value.code == "UP3_FUTURE_CODE"
     assert not isinstance(exc_info.value, DuplicateResourceError)
 
 

@@ -421,10 +421,20 @@ class UP3ExecutionModeMismatch(UP3Error):
     code = "UP3_EXECUTION_MODE_MISMATCH"
 
 
+class UP3CartAbandoned(UP3Error):
+    """UP3_CART_ABANDONED — this ``cart.id`` was abandoned with
+    ``payments.abandon_cart`` before the bank stored it, and a late
+    ``send_with_mandates`` of the same cart arrived (HTTP 409). Nothing was
+    held, sent or written. Mint a new cart (new seed) to retry. (B-35.)"""
+
+    code = "UP3_CART_ABANDONED"
+
+
 # Map error code strings -> exception classes for http_client error handling.
 UP3_ERROR_CODE_MAP: dict[str, type[UP3Error]] = {
     "UP3_MANDATE_REQUIRED": UP3MandateRequired,
     "UP3_EXECUTION_MODE_MISMATCH": UP3ExecutionModeMismatch,
+    "UP3_CART_ABANDONED": UP3CartAbandoned,
     "UP3_PAYER_MISMATCH": UP3PayerMismatch,
     "UP3_ISSUER_MISMATCH": UP3IssuerMismatch,
     "UP3_TYPE_REQUIRED_MISSING": UP3TypeRequiredMissing,
