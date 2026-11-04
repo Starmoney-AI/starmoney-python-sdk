@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- New `PhoneCountryNotSupportedError` (subclass of `InvalidPhoneError`) for the bank's `422 PHONE_COUNTRY_NOT_SUPPORTED` (B-45): the recipient's phone country is not on the bank's allow-list; `errors[0].expected` lists the allowed region codes. Code catching `InvalidPhoneError` keeps working.
+
 ## [0.3.5] — 2026-11-03
 
 - `deferred_transfers.list(...)` rows and `deferred_transfers.get(...)` carry `funding_source` (`"viban_hold"` | `"external_pull"`), `sender_account_reference` (None for external_pull) and `recipient_account_reference` (full, None until claimed; mask it) (bank B-56). Typed as `DeferredTransferListItem` / `DeferredTransferRead` / `DeferredFundingSource` in `starmoney.resources.deferred_transfers`. Additive.

@@ -190,6 +190,14 @@ class InvalidPhoneError(APIError):
     (libphonenumber). ``response_data["detail"]["errors"]`` names the field."""
 
 
+class PhoneCountryNotSupportedError(InvalidPhoneError):
+    """422 ``PHONE_COUNTRY_NOT_SUPPORTED`` — the recipient number is valid but
+    its country is outside this environment's allow-list (B-45; off on stage).
+    ``errors[0].expected`` lists the allowed ISO codes, e.g. ``"SN"``.
+    Subclasses InvalidPhoneError, so an existing ``except InvalidPhoneError``
+    still catches it."""
+
+
 class BeneficiaryAddLimitReachedError(APIError):
     """429 ``BENEFICIARY_ADD_LIMIT_REACHED`` — more than 20 phone/handle adds
     in the rolling 24 h (201 and 202 both count). ``retry_after_seconds`` says
