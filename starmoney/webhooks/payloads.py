@@ -124,6 +124,13 @@ class _PaymentReceivedPayloadRequired(TypedDict):
     # The sending bank's name (e.g. "SOCIETE GENERALE SENEGAL"); None on an
     # internal deferred-transfer claim credit.
     source_bank_name: Optional[str]
+    # Bank B-79: the RECIPIENT's own active saved payee for the sender and its
+    # current name, e.g. the «Djo» the recipient saved for a sender whose own
+    # name is «Souleymane». Always present on the wire, None when the sender is
+    # unknown, matches no saved payee, or matches more than one. Read with
+    # ``.get()`` against a bank older than B-79.
+    sender_payee_id: Optional[str]
+    sender_payee_name: Optional[str]
     metadata: WebhookMetadata
 
 

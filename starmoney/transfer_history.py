@@ -69,7 +69,9 @@ class TransferHistoryRow(_TransferHistoryRowBase, total=False):
     fee_grid_version: Optional[int]
     # B-78 (absent from a bank older than this field). out: the sender's saved
     # payee for this send and the name it carries NOW (the name at send time if
-    # the payee was deleted); None when the send matched no saved payee. in: None.
+    # the payee was deleted); None when the send matched no saved payee. in (B-79):
+    # the holder's own active payee whose IBAN is the payer's, its current name;
+    # None when the payer's IBAN is unknown or matches no (or two) payees.
     # ``counterparty_name`` stays the verified holder name.
     payee_id: Optional[str]
     payee_name: Optional[str]

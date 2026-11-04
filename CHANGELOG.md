@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- `PaymentReceivedPayload` gains `sender_payee_id` / `sender_payee_name` (bank B-79; always sent, so typed like `sender_name`; read with `.get()` against an older bank): the recipient's own saved payee for the sender and its current name; `None` when unknown. `TransferHistoryRow.payee_id` / `payee_name` are now also set on `in` rows (the holder's payee for the payer's IBAN). Additive. Example: Awa saved Djo's account as «Djo»; Djo («Souleymane») sends her 2 000 XOF; `payment.received` has `sender_name="Souleymane"`, `sender_payee_name="Djo"`, and your bot decides which to show.
+
 ## [0.3.6] — 2026-11-04
 
 - `TransferHistoryRow` gains (optional keys, absent from an older bank) `payee_id` and `payee_name` (bank B-78): the sender's saved payee for that send and the name it carries now (the name at send time if the payee was deleted); both `None` when the send matched no saved payee, and on every `in` row. `counterparty_name` is unchanged (the verified holder name). Additive. Example: DJO saved «Souleymane Dubaï» for a holder the bank verifies as «SoulDubai D.»; his row reads `counterparty_name="SoulDubai D."`, `payee_name="Souleymane Dubaï"`, and after he renames the payee, the new name.
