@@ -19,6 +19,7 @@ from .exceptions import (
     InvalidIBANError,
     SelfTransferNotAllowedError,
     InvalidPhoneError,
+    PhoneCountryNotSupportedError,
     BeneficiaryAddLimitReachedError,
     PreKycCeilingExceededError,
     PreKycTotalCeilingExceededError,
@@ -138,6 +139,8 @@ class HTTPClient:
             error_code = error_data.get("error_code") or detail_code
         if error_code == "INVALID_IBAN":
             raise InvalidIBANError(message, error_data, response.status_code)
+        if error_code == "PHONE_COUNTRY_NOT_SUPPORTED":
+            raise PhoneCountryNotSupportedError(response.status_code, message, error_data)
         if error_code == "INVALID_PHONE":
             raise InvalidPhoneError(response.status_code, message, error_data)
         if error_code == "SELF_TRANSFER_NOT_ALLOWED":
