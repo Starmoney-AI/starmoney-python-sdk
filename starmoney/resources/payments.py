@@ -1,7 +1,7 @@
 """StarMoney SDK - Payments Resource"""
 
 from decimal import Decimal
-from typing import TYPE_CHECKING, Any, Optional
+from typing import TYPE_CHECKING, Any, Literal, Optional, TypedDict
 
 from .._iban import is_valid_iban
 from ..exceptions import InvalidIBANError
@@ -9,6 +9,33 @@ from ..http_client import HTTPClient
 
 if TYPE_CHECKING:
     from ..up3.resource import UP3Resource
+
+
+class StoredMandates(TypedDict, total=False):
+    """``GET /v1/mandates/{cart_id}`` (bank B-37): what the bank holds for one cart.
+
+    ``status`` is ``"stored"`` (the send reached the bank: ``intent``, ``cart``,
+    ``payment_mandates`` and ``money_status`` are filled) or ``"abandoned"``
+    (only ``abandoned_at`` is set, ``payment_mandates`` is empty).
+    """
+
+    cart_id: str
+    status: Literal["stored", "abandoned"]
+    intent: Optional[dict[str, Any]]
+    cart: Optional[dict[str, Any]]
+    # Every PaymentMandate revision as stored, revision 1..n in order.
+    payment_mandates: list[dict[str, Any]]
+    # Same body as ``get_status(user_id, cart_id)``; None if no payment row yet.
+    money_status: Optional[dict[str, Any]]
+    abandoned_at: Optional[str]
+
+
+class CartAbandonment(TypedDict):
+    """``POST /v1/payments/{cart_id}/abandon`` (bank B-35): 200, first call and every repeat."""
+
+    cart_id: str
+    status: Literal["abandoned"]
+    abandoned_at: str
 
 
 class PaymentsResource:
@@ -242,6 +269,43 @@ class PaymentsResource:
               Null otherwise.
         """
         response = await self.http.get(f"/payments/status/{client_transaction_id}", user_id=user_id)
+        return response.json()
+
+    async def get_mandates(self, user_id: str, cart_id: str) -> StoredMandates:
+        """
+        What does the bank hold for this cart? (``GET /v1/mandates/{cart_id}``, B-37)
+
+        Use it after a timeout on ``send_with_mandates``: ``cart_id`` is the id
+        you derived from your seed (``client.up3.cart_id_for(seed)``). Read-only,
+        scoped to your service: another service's cart answers like an unknown one.
+
+        Returns:
+            StoredMandates: ``status="stored"`` with the Intent, the Cart, every
+            PaymentMandate revision in order and ``money_status`` (the body
+            ``get_status`` gives); or ``status="abandoned"`` after
+            :meth:`abandon_cart` (no envelopes).
+
+        Raises:
+            PaymentNotFoundError (404 RESOURCE_NOT_FOUND): the bank never stored the
+                cart and it was not abandoned. Safe to :meth:`abandon_cart`.
+        """
+        response = await self.http.get(f"/mandates/{cart_id}", user_id=user_id)
+        return response.json()
+
+    async def abandon_cart(self, user_id: str, cart_id: str) -> CartAbandonment:
+        """
+        Abandon a cart the bank has not stored (``POST /v1/payments/{cart_id}/abandon``, B-35).
+
+        After this a LATE ``send_with_mandates`` of the same cart is refused with
+        ``UP3CartAbandoned`` (409) before any hold, rail call or ledger step, so
+        you can tell the customer nothing left their account. Idempotent: a
+        second call returns the same answer.
+
+        Raises:
+            UP3Replay (409): the bank already stored this cart, the send DID
+                arrive and cannot be abandoned. Read it with :meth:`get_mandates`.
+        """
+        response = await self.http.post(f"/payments/{cart_id}/abandon", user_id=user_id)
         return response.json()
 
     async def send_with_mandates(

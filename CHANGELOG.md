@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- `client.payments.get_mandates(user_id, cart_id)` (bank B-37) returns the typed `StoredMandates` (`status` `"stored"` or `"abandoned"`, `intent`, `cart`, `payment_mandates`, `money_status`, `abandoned_at`); a cart the bank never stored raises `PaymentNotFoundError` (404, `error_code` `RESOURCE_NOT_FOUND`). `client.payments.abandon_cart(user_id, cart_id)` (bank B-35) returns `CartAbandonment` (idempotent), and raises `UP3Replay` when the bank already stored the cart. A late `send_with_mandates` of an abandoned cart raises the new `UP3CartAbandoned` (`UP3_CART_ABANDONED`, 409). Example: Awa's 5 000 XOF send to Moussa times out at 12:05:30; `get_mandates(...)` raises `PaymentNotFoundError`, `abandon_cart(...)` returns, adita tells Awa nothing left her account, and the same send arriving late is refused with `UP3CartAbandoned`.
+
 ## [0.3.6] — 2026-11-04
 
 - `TransferHistoryRow` gains (optional keys, absent from an older bank) `payee_id` and `payee_name` (bank B-78): the sender's saved payee for that send and the name it carries now (the name at send time if the payee was deleted); both `None` when the send matched no saved payee, and on every `in` row. `counterparty_name` is unchanged (the verified holder name). Additive. Example: DJO saved «Souleymane Dubaï» for a holder the bank verifies as «SoulDubai D.»; his row reads `counterparty_name="SoulDubai D."`, `payee_name="Souleymane Dubaï"`, and after he renames the payee, the new name.

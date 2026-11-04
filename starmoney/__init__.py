@@ -74,6 +74,7 @@ from .exceptions import (
     UP3Error,
     UP3AmountExceedsIntent,
     UP3BeneficiaryDrift,
+    UP3CartAbandoned,
     UP3ChainBroken,
     UP3ExecutionModeMismatch,
     UP3Expired,
@@ -91,6 +92,7 @@ from .exceptions import (
     UP3StatusInvalid,
     UP3TypeNotAccepted,
 )
+from .resources.payments import CartAbandonment, StoredMandates
 from .resources.recipients import RecipientCheck
 from .transfer_history import TransferDirection, TransferHistoryPage, TransferHistoryRow
 from .webhooks.events import WebhookEvent
@@ -155,6 +157,8 @@ __all__ = [
     "AccountKycReviewRequiredPayload",
     "FeeLine",
     "RecipientCheck",
+    "CartAbandonment",
+    "StoredMandates",
     "FundsOutcome",
     "FeeRefundMarker",
     "FeeRefundLine",
@@ -183,6 +187,7 @@ __all__ = [
     "UP3Error",
     "UP3AmountExceedsIntent",
     "UP3BeneficiaryDrift",
+    "UP3CartAbandoned",
     "UP3ChainBroken",
     "UP3ExecutionModeMismatch",
     "UP3Expired",
