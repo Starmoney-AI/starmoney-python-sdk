@@ -91,6 +91,12 @@ class WebhookEvent(str, Enum):
     """The sender cancelled before the claim; the hold was released (money back).
     ``reason_code``: ``cancelled_by_sender``."""
 
+    DEFERRED_TRANSFER_FAILED = "deferred_transfer.failed"
+    """A pull-funded (best-effort) transfer ended ``failed``: BDK refused the pull
+    from the sender's account at the claim, or the pull payment failed. Nothing
+    was taken and nothing is retried. Carries ``recipient_handle`` so the consumer
+    can tell the recipient. ``reason_code``: ``bdk_refused`` | ``payment_failed``."""
+
     # -----------------------------------------------------------------
     # Account lifecycle — sensitivity: USER_PRIVATE (ADR-002)
     # -----------------------------------------------------------------
