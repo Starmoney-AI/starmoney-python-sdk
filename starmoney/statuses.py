@@ -59,6 +59,9 @@ class DeferredTransferStatus(str, Enum):
     reserved → claimed → settling → settled; claimed_pending_kyc waits for KYC.
     SETTLED means SENT (BDK accepted, sender debited) — the recipient's credit
     comes as their own payment.received. settling is NOT cancellable.
+    A transfer funded from the sender's BDK account (``external_pull``) is ``armed``
+    until the recipient opens an account, then pulls; if the bank refuses it ends
+    ``failed`` (the sender's ``payment.failed`` says nothing was taken).
     """
 
     RESERVED = "reserved"
@@ -70,3 +73,4 @@ class DeferredTransferStatus(str, Enum):
     EXPIRED = "expired"
     RELEASED = "released"  # the hold was released; the sender has the money back
     CANCELLED = "cancelled"
+    FAILED = "failed"  # Branch B: the bank refused the pull at the claim; nothing was taken

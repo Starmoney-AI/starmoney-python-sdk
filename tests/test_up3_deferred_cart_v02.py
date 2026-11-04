@@ -320,3 +320,63 @@ async def test_send_with_mandates_needs_the_up3_resource_and_a_deferred_quote():
             "user-1", user_ref="whatsapp:+221770000001", refusal=_refusal(),
             beneficiary_value=PHONE, amount_minor=20_000,
         )
+
+
+# ---------------------------------------------------------------------------
+# execution_mode (bank B-40)
+# ---------------------------------------------------------------------------
+
+
+def test_execution_mode_is_absent_unless_asked_so_nothing_changes_for_existing_callers():
+    resource = _resource()
+    cart = resource.build_deferred_cart_v02(
+        _intent(resource), refusal=_refusal(), beneficiary_value=PHONE, amount_minor=20_000
+    )
+    assert "execution_mode" not in cart["payload"]
+
+
+def test_a_best_effort_cart_signs_the_mode_and_validates_against_the_bank_schema():
+    resource = _resource()
+    cart = resource.build_deferred_cart_v02(
+        _intent(resource),
+        refusal=_refusal(),
+        beneficiary_value=PHONE,
+        amount_minor=20_000,
+        execution_mode="deferred_best_effort",
+    )
+    assert cart["payload"]["execution_mode"] == "deferred_best_effort"
+    assert verify(cart, secret=SECRET) is True
+    schema = json.loads(_SCHEMA.read_text())
+    assert "execution_mode" in schema["properties"]["payload"]["properties"]
+    assert "execution_mode" not in schema["properties"]["payload"]["required"]
+    jsonschema = pytest.importorskip("jsonschema")
+    jsonschema.validate(cart, schema)
+    # the mode is under the signature: changing it breaks the cart
+    cart["payload"]["execution_mode"] = "immediate"
+    assert verify(cart, secret=SECRET) is False
+
+
+def test_an_unknown_execution_mode_is_refused_before_signing():
+    resource = _resource()
+    with pytest.raises(ValueError, match="execution_mode"):
+        resource.build_deferred_cart_v02(
+            _intent(resource), refusal=_refusal(), beneficiary_value=PHONE, amount_minor=20_000,
+            execution_mode="best_effort",
+        )
+    with pytest.raises(ValueError, match="execution_mode"):
+        resource.build_cart_v02(_intent(resource), quote={}, execution_mode="soon")
+
+
+def test_the_immediate_cart_builder_carries_the_mode_too():
+    resource = _resource()
+    quote = {
+        "quote": {"id": QUOTE_ID, "digest": DIGEST, "digest_alg": "sha256-jcs-v1"},
+        "beneficiary": {"type": "msisdn", "value": PHONE},
+        "amount_minor": 20_000,
+        "currency": "XOF",
+        "fees_minor": {"orchestrator": 0, "bank": 0},
+        "display_name": "Moussa B.",
+    }
+    cart = resource.build_cart_v02(_intent(resource), quote=quote, execution_mode="immediate")
+    assert cart["payload"]["execution_mode"] == "immediate"
+    assert "execution_mode" not in resource.build_cart_v02(_intent(resource), quote=quote)["payload"]

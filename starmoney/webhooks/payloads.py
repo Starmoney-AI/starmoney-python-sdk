@@ -207,6 +207,23 @@ DeferredTransferExpiredPayload = DeferredTransferClosedPayload
 DeferredTransferCancelledPayload = DeferredTransferClosedPayload
 
 
+class _DeferredTransferFailedPayloadRequired(_DeferredTransferClosedPayloadRequired):
+    failed_at: str  # ISO-8601 UTC, when the transfer ended failed
+
+
+class DeferredTransferFailedPayload(_DeferredTransferFailedPayloadRequired, total=False):
+    """Delivered body for :attr:`WebhookEvent.DEFERRED_TRANSFER_FAILED` (bank B-40).
+
+    A pull-funded transfer ended ``failed`` after the claim: nothing was taken
+    from the sender and nothing is retried. The sender's own ``payment.failed``
+    (``funds=not_debited``) arrives separately; this one goes to the sending
+    service so it can tell the recipient (``recipient_handle``).
+    ``reason_code``: ``bdk_refused`` | ``payment_failed``.
+    """
+
+    client_reference: str  # ADR-004: only present when the caller supplied one
+
+
 class _PaymentInitiatedPayloadRequired(TypedDict):
     event_type: str  # always "payment.initiated"
     timestamp: str

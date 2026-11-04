@@ -13,6 +13,7 @@ import pytest
 from starmoney.exceptions import (
     DuplicateResourceError,
     UP3Error,
+    UP3ExecutionModeMismatch,
     UP3Expired,
     UP3IssuerMismatch,
     UP3MandateRequired,
@@ -45,6 +46,7 @@ def test_mandate_required_409_is_a_up3_refusal_not_a_duplicate():
         (409, "UP3_PAYER_MISMATCH", UP3PayerMismatch),
         (409, "UP3_ISSUER_MISMATCH", UP3IssuerMismatch),
         (409, "UP3_REPLAY", UP3Replay),
+        (409, "UP3_EXECUTION_MODE_MISMATCH", UP3ExecutionModeMismatch),
         (410, "UP3_EXPIRED", UP3Expired),
         (422, "UP3_TYPE_REQUIRED_MISSING", UP3TypeRequiredMissing),
     ],

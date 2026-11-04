@@ -411,9 +411,20 @@ class UP3TypeRequiredMissing(UP3Error):
     code = "UP3_TYPE_REQUIRED_MISSING"
 
 
+class UP3ExecutionModeMismatch(UP3Error):
+    """UP3_EXECUTION_MODE_MISMATCH — the cart's ``payload.execution_mode``
+    contradicts the signed quote's outcome or the request's ``funding_source``
+    (HTTP 409). A refusal, nothing written. ``errors[0]`` is
+    ``{"field": "payload.execution_mode", "rule": "quote.outcome" | "quote.match",
+    "expected": <the mode reality supports>}``. (B-40.)"""
+
+    code = "UP3_EXECUTION_MODE_MISMATCH"
+
+
 # Map error code strings -> exception classes for http_client error handling.
 UP3_ERROR_CODE_MAP: dict[str, type[UP3Error]] = {
     "UP3_MANDATE_REQUIRED": UP3MandateRequired,
+    "UP3_EXECUTION_MODE_MISMATCH": UP3ExecutionModeMismatch,
     "UP3_PAYER_MISMATCH": UP3PayerMismatch,
     "UP3_ISSUER_MISMATCH": UP3IssuerMismatch,
     "UP3_TYPE_REQUIRED_MISSING": UP3TypeRequiredMissing,
