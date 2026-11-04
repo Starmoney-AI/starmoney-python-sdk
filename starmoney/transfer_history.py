@@ -67,6 +67,12 @@ class TransferHistoryRow(_TransferHistoryRowBase, total=False):
     fee_total_minor: Optional[int]
     total_debit_minor: Optional[int]
     fee_grid_version: Optional[int]
+    # B-78 (absent from a bank older than this field). out: the sender's saved
+    # payee for this send and the name it carries NOW (the name at send time if
+    # the payee was deleted); None when the send matched no saved payee. in: None.
+    # ``counterparty_name`` stays the verified holder name.
+    payee_id: Optional[str]
+    payee_name: Optional[str]
 
 
 class TransferHistoryPage(TypedDict):

@@ -2,6 +2,7 @@
 
 ## [Unreleased]
 
+- `TransferHistoryRow` gains (optional keys, absent from an older bank) `payee_id` and `payee_name` (bank B-78): the sender's saved payee for that send and the name it carries now (the name at send time if the payee was deleted); both `None` when the send matched no saved payee, and on every `in` row. `counterparty_name` is unchanged (the verified holder name). Additive. Example: DJO saved «Souleymane Dubaï» for a holder the bank verifies as «SoulDubai D.»; his row reads `counterparty_name="SoulDubai D."`, `payee_name="Souleymane Dubaï"`, and after he renames the payee, the new name.
 - `WebhookValidator.verify_signature(...)` returns `False` when the validator's `webhook_secret` is empty or the signature header is missing, instead of computing an HMAC over an empty key. Example: a bot whose secret failed to load answers every webhook with "invalid signature" rather than accepting a signature anyone could forge with an empty key. Callers should still answer 503 when their secret is not loaded.
 - New `PhoneCountryNotSupportedError` (subclass of `InvalidPhoneError`) for the bank's `422 PHONE_COUNTRY_NOT_SUPPORTED` (B-45): the recipient's phone country is not on the bank's allow-list; `errors[0].expected` lists the allowed region codes. Code catching `InvalidPhoneError` keeps working.
 

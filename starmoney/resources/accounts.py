@@ -148,7 +148,9 @@ class AccountsResource:
         ``currency``, ``status``, ``date``, ``account_reference`` /
         ``account_label`` (the holder's own vIBAN, "Compte StarMoney"),
         ``counterparty_name``, ``counterparty_iban``, ``motif`` and
-        ``sm_reference`` (+ ``customer_reference``, same value). ``out`` rows
+        ``sm_reference`` (+ ``customer_reference``, same value), ``payee_id`` and
+        ``payee_name`` (the sender's saved payee for an ``out`` row and its current
+        name; ``None`` when there is none and on ``in`` rows). ``out`` rows
         keep every field they always had (``transaction_id``,
         ``client_transaction_id``, ``recipient_iban``, the fee line, ...).
         See :class:`starmoney.transfer_history.TransferHistoryRow`.
