@@ -252,7 +252,10 @@ class DeferredTransfersResource:
             ValueError: no deferred quote, or ``hold_days`` outside 1–7.
             APIError subclasses with the B-32 envelope — ``QUOTE_MISMATCH``,
             ``UP3_QUOTE_DRIFT`` / ``UP3_REPLAY`` / ``UP3_EXPIRED`` (quote
-            state), ``UP3_EXECUTION_WINDOW_INVALID`` (R1–R4).
+            state), ``UP3_EXECUTION_WINDOW_INVALID`` (R1–R4),
+            ``UP3_EXECUTION_MODE_MISMATCH`` (the cart's ``execution_mode`` contradicts
+            the quote or ``funding_source``; a ``deferred_best_effort`` cart is the
+            pull from the sender's BDK account).
         """
         if self._up3 is None:
             raise RuntimeError(
@@ -310,7 +313,7 @@ class DeferredTransfersResource:
             status: Optional comma-separated status filter (e.g. "reserved,armed").
                     When omitted, the API defaults to the cancellable set
                     (reserved, armed). Valid values: reserved, armed, claimed,
-                    claimed_pending_kyc, settling, settled, expired, released, cancelled.
+                    claimed_pending_kyc, settling, settled, expired, released, cancelled, failed.
             limit: Max transfers to return (default 20, capped at 100 server-side).
             offset: Number of transfers to skip (pagination).
             client_transaction_id: (0.3.0, B-71) only the transfer YOU sent under

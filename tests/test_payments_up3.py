@@ -361,6 +361,7 @@ def test_up3_error_code_map_covers_all_13_codes():
         "UP3_BENEFICIARY_DRIFT",
         "UP3_RAIL_DRIFT",
         "UP3_REVISION_REGRESSION",
+        "UP3_EXECUTION_MODE_MISMATCH",
     }
     assert set(UP3_ERROR_CODE_MAP.keys()) == expected_codes
 

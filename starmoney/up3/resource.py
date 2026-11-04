@@ -100,6 +100,15 @@ def _derive_cart_id(issuer: str, seed: str) -> str:
     return f"mnd_{b32[:26].upper()}"
 
 
+# The closed set of ``payload.execution_mode`` values (UP3 0.2-draft, B-40).
+_EXECUTION_MODES = ("immediate", "deferred_held", "deferred_best_effort")
+
+
+def _check_execution_mode(execution_mode: Optional[str]) -> None:
+    if execution_mode is not None and execution_mode not in _EXECUTION_MODES:
+        raise ValueError(f"execution_mode must be one of {_EXECUTION_MODES}, got {execution_mode!r}")
+
+
 # "argument not passed" sentinel for build_cart_v02.beneficiary_name, whose
 # meaningful default (the quote's display_name) may itself be None.
 _UNSET: Any = object()
@@ -328,6 +337,7 @@ class UP3Resource:
         consent_evidence: Optional[dict[str, Any]] = None,
         ttl_minutes: int = 2,
         idempotency_seed: Optional[str] = None,
+        execution_mode: Optional[str] = None,
     ) -> dict[str, Any]:
         """Build and sign a **0.2** CartMandate that signs a quote (transfer routes, 0.3.0).
 
@@ -365,6 +375,11 @@ class UP3Resource:
             idempotency_seed: Same contract as :meth:`build_cart` — the SAME
                 seed on a transport retry of the SAME authorization derives
                 the same ``cart.id`` and the bank answers the stored outcome.
+            execution_mode: Optional ``payload.execution_mode`` (B-40):
+                ``"immediate"`` | ``"deferred_held"`` | ``"deferred_best_effort"``.
+                Omit it and the bank infers it from the quote (this cart
+                signs a credit / external quote: ``immediate``). A mode that
+                contradicts the quote is refused ``UP3_EXECUTION_MODE_MISMATCH``.
 
         Returns:
             Signed ``version: "0.2"`` CartMandate envelope, ready to POST as
@@ -374,6 +389,7 @@ class UP3Resource:
             ValueError: the quote dict lacks the keys a 0.2 cart signs, or is
                 a ``deferred`` quote.
         """
+        _check_execution_mode(execution_mode)
         try:
             ref = quote["quote"]
             quote_id, digest, digest_alg = ref["id"], ref["digest"], ref["digest_alg"]
@@ -420,6 +436,8 @@ class UP3Resource:
             "confirmed_at": confirmed_at,
             "user_consent_evidence": consent_evidence,
         }
+        if execution_mode is not None:
+            payload["execution_mode"] = execution_mode
         envelope: dict[str, Any] = {
             "version": "0.2",
             "type": "cart",
@@ -446,6 +464,7 @@ class UP3Resource:
         consent_evidence: Optional[dict[str, Any]] = None,
         ttl_minutes: int = 2,
         idempotency_seed: Optional[str] = None,
+        execution_mode: Optional[str] = None,
     ) -> dict[str, Any]:
         """Build and sign a **0.2** CartMandate that consents to a DEFERRED
         transfer — the hold from the quote (bank PR-D, B-67).
@@ -485,6 +504,16 @@ class UP3Resource:
                 on a retry derives the same ``cart.id``, which is the
                 ``client_transaction_id`` of the hold — the bank answers the
                 stored deferred transfer.
+            execution_mode: Optional ``payload.execution_mode`` (B-40).
+                Omit it for the hold on the sender's StarMoney account (the
+                bank reads ``deferred_held`` from the deferred quote). Pass
+                ``"deferred_best_effort"`` to consent instead to the pull from
+                the sender's **BDK account** when the recipient opens an
+                account: nothing is held, the bank may refuse at that moment
+                (short balance), and the transfer then ends ``failed`` with
+                nothing taken. The mode is signed with the cart; post it with
+                ``funding_source`` omitted (or ``"external_pull"``). Never
+                inferred by the bank — it is only ever consented to here.
 
         Returns:
             Signed ``version: "0.2"`` CartMandate envelope with
@@ -495,6 +524,7 @@ class UP3Resource:
             ValueError: no deferred quote in the refusal, a non-E.164 phone, a
                 non-positive amount, or ``hold_days`` outside 1–7.
         """
+        _check_execution_mode(execution_mode)
         dq = refusal.get("deferred_quote") if "deferred_quote" in refusal else refusal
         if not isinstance(dq, dict) or "digest" not in dq:
             raise ValueError(
@@ -546,6 +576,8 @@ class UP3Resource:
             "confirmed_at": confirmed_at,
             "user_consent_evidence": consent_evidence,
         }
+        if execution_mode is not None:
+            payload["execution_mode"] = execution_mode
         envelope: dict[str, Any] = {
             "version": "0.2",
             "type": "cart",
