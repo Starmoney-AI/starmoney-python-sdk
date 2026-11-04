@@ -61,6 +61,11 @@ class WebhookValidator:
                 # Process webhook...
             ```
         """
+        # Fail closed: an empty or unset secret would accept any body HMAC'd with
+        # the empty key (found by adita, 4 Nov). No secret, no valid signature.
+        if not self.webhook_secret or not signature_header:
+            return False
+
         # Compute expected signature using HMAC-SHA256
         expected_signature = hmac.new(
             self.webhook_secret.encode("utf-8"), payload, hashlib.sha256

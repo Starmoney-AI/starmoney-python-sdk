@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- `WebhookValidator.verify_signature(...)` returns `False` when the validator's `webhook_secret` is empty or the signature header is missing, instead of computing an HMAC over an empty key. Example: a bot whose secret failed to load answers every webhook with "invalid signature" rather than accepting a signature anyone could forge with an empty key. Callers should still answer 503 when their secret is not loaded.
+
 ## [0.3.5] — 2026-11-03
 
 - `deferred_transfers.list(...)` rows and `deferred_transfers.get(...)` carry `funding_source` (`"viban_hold"` | `"external_pull"`), `sender_account_reference` (None for external_pull) and `recipient_account_reference` (full, None until claimed; mask it) (bank B-56). Typed as `DeferredTransferListItem` / `DeferredTransferRead` / `DeferredFundingSource` in `starmoney.resources.deferred_transfers`. Additive.
