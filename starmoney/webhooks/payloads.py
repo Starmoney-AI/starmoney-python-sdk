@@ -88,8 +88,8 @@ class _DeferredTransferSentPayloadRequired(TypedDict):
     sender_display_name: str
     notification_copy: str
     # Bank B-54: the sender's own wording for the send. Always present on the
-    # wire; None today (a deferred send carries no motif). Read with ``.get()``
-    # against a bank older than B-54.
+    # wire; the wording given on the deferred send, None when none. Read with
+    # ``.get()`` against a bank older than B-54.
     description: Optional[str]
     metadata: WebhookMetadata
 
@@ -171,8 +171,8 @@ class _DeferredTransferSettledPayloadRequired(TypedDict):
     recipient_handle: Optional[str]  # the handle the sender addressed
     recipient_display_name: Optional[str]  # the recipient's first name
     recipient_user_id: Optional[str]
-    # Bank B-54: the sender's own wording; always present, None for a deferred
-    # transfer today. Read with ``.get()`` against a bank older than B-54.
+    # Bank B-54: the sender's own wording (as on ``.sent``); always present, None
+    # when the sender gave none. Read with ``.get()`` against a bank older than B-54.
     description: Optional[str]
     metadata: WebhookMetadata
 
@@ -260,8 +260,8 @@ class _PaymentInitiatedPayloadRequired(TypedDict):
     rail_name: str
     initiated_at: str
     # Bank B-54: the sender's own wording for the send («loyer»). Always present
-    # on the wire; "Virement" when a quoted send had none, None on a deferred
-    # transfer's settle payment. Read with ``.get()`` against a bank older than B-54.
+    # on the wire; "Virement" when a quoted send had none; a deferred transfer's
+    # settle payment carries the transfer's wording, None when none. Read with ``.get()`` against a bank older than B-54.
     description: Optional[str]
     sm_reference: str  # StarMoney's reference for the customer to quote (0.3.0) — read this one
     customer_reference: str  # the same value under its 0.2.2 name; deprecated, dropped in 0.4.0

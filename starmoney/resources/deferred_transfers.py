@@ -27,6 +27,9 @@ class _DeferredTransferAccountFields(TypedDict):
     # deferred_transfer.settled carries); null before. Always sent; read with
     # ``.get()`` against a bank older than B-54.
     recipient_display_name: Optional[str]
+    # B-54: the sender's own wording for the send (max 30 characters); null when
+    # none. Always sent; read with ``.get()`` against a bank older than this field.
+    description: Optional[str]
 
 
 class DeferredTransferListItem(_DeferredTransferAccountFields):
@@ -77,6 +80,7 @@ class DeferredTransfersResource:
         client_reference: Optional[str] = None,
         user_id: Optional[str] = None,
         *,
+        description: Optional[str] = None,
         quote_id: Optional[str] = None,
         intent_mandate: Optional[dict[str, Any]] = None,
         cart_mandate: Optional[dict[str, Any]] = None,
@@ -123,13 +127,20 @@ class DeferredTransfersResource:
                             (Branch B).
             linked_external_account_id: Branch B only. Required when
                                         funding_source='external_pull'.
+            description: The sender's own wording for the transfer (max 30
+                         characters, e.g. 'loyer'). Optional with any of the
+                         three shapes (a quote or a cart carries no wording).
+                         Stored with the transfer, echoed on
+                         ``deferred_transfer.sent`` / ``.settled`` and read back
+                         as ``description``. Sent only when given.
 
         Returns:
             DeferredTransferResponse dict with keys:
               id, sm_reference (customer_reference until 0.4.0),
               client_transaction_id, sender_user_id, recipient_handle,
               amount_minor, currency, branch, status, expires_at, created_at,
-              updated_at, and the fee line of a quoted hold (``quote_id``,
+              updated_at, description (the sender's wording, null when none),
+              and the fee line of a quoted hold (``quote_id``,
               ``settlement_rail``, ``fees_minor``, ``fee_total_minor``,
               ``total_debit_minor``, ``fee_grid_version`` — null on a legacy send).
 
@@ -189,6 +200,8 @@ class DeferredTransfersResource:
             payload["linked_external_account_id"] = linked_external_account_id
         if client_reference is not None:
             payload["client_reference"] = client_reference
+        if description is not None:
+            payload["description"] = description
 
         # The sender is the JWT sub claim: pass user_id so the request is signed
         # for that user (0.1.22; before, callers had to post raw HTTP for it).
@@ -245,6 +258,10 @@ class DeferredTransfersResource:
             amount_minor: The amount quoted.
             execute_before / hold_days: The execution window; default 7 days
                 from the tap. See :meth:`UP3Resource.build_deferred_cart_v02`.
+            description: The sender's wording (max 30 characters, e.g. ``"loyer"``).
+                Sent in the request body (the signed cart carries no wording) and
+                also used as the intent's human echo, as in ``payments.send_with_mandates``;
+                the bank refuses one over 30 characters with 422.
             consent_token: ``user_consent_evidence`` (the ConsentToken).
             idempotency_seed: The retry anchor (e.g. the consent jti).
 
@@ -291,6 +308,7 @@ class DeferredTransfersResource:
             user_id=user_id,
             currency=currency,
             client_reference=client_reference,
+            description=description,
             intent_mandate=intent,
             cart_mandate=cart,
         )
@@ -338,7 +356,8 @@ class DeferredTransfersResource:
               sender_account_reference (null for external_pull),
               recipient_account_reference (full, null until claimed; mask it),
               recipient_display_name (the recipient's first name once they have
-              an account, else null).
+              an account, else null), description (the sender's wording, null
+              when none).
               See :class:`DeferredTransferListItem`.
 
         Raises:

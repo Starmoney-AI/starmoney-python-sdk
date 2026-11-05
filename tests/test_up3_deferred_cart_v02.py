@@ -307,6 +307,29 @@ async def test_send_with_mandates_builds_the_chain_and_posts_nothing_else():
 
 
 @pytest.mark.asyncio
+async def test_send_with_mandates_posts_the_wording_only_when_given():
+    """B-54: «loyer» goes in the body (the signed cart carries no wording) and is
+    the intent's echo too; without it the body is unchanged."""
+    resource, http = _dt_resource()
+    await resource.send_with_mandates(
+        "user-1", user_ref="whatsapp:+221770000001", refusal=_refusal(),
+        beneficiary_value=PHONE, amount_minor=20_000, idempotency_seed="jti-w",
+        description="loyer",
+    )
+    body = http.post.call_args.kwargs["json"]
+    assert body["description"] == "loyer"
+    assert body["intent_mandate"]["payload"]["description"] == "loyer"
+    assert "description" not in body["cart_mandate"]["payload"]
+
+    resource, http = _dt_resource()
+    await resource.send_with_mandates(
+        "user-1", user_ref="whatsapp:+221770000001", refusal=_refusal(),
+        beneficiary_value=PHONE, amount_minor=20_000, idempotency_seed="jti-w2",
+    )
+    assert "description" not in http.post.call_args.kwargs["json"]
+
+
+@pytest.mark.asyncio
 async def test_send_with_mandates_needs_the_up3_resource_and_a_deferred_quote():
     resource, _ = _dt_resource()
     with pytest.raises(ValueError, match="deferred_quote"):
