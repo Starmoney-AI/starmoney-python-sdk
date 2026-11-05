@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- Beneficiary items (`beneficiaries.list(...)` rows and the `create` / `get` / `update` / `toggle_favorite` results) carry `verified_holder_name` (bank B-80, typed `PayeeVerifiedHolder`; always sent, so typed required, read with `.get()` against an older bank): the bank-verified holder as a quote shows it, first name plus last-name initial; `None` for an external IBAN, a pending request and a closed holder. `name` stays the saved label. Additive. Example: DJO saved «Souleymane Dubaï» for vIBAN ···5662; the row has `name="Souleymane Dubaï"`, `verified_holder_name="SoulDubai D."`; an external SGBS IBAN row has `None`.
+
 ## [0.3.7] — 2026-11-04
 
 - `PaymentReceivedPayload` gains `sender_payee_id` / `sender_payee_name` (bank B-79; always sent, so typed like `sender_name`; read with `.get()` against an older bank): the recipient's own saved payee for the sender and its current name; `None` when unknown. `TransferHistoryRow.payee_id` / `payee_name` are now also set on `in` rows (the holder's payee for the payer's IBAN). Additive. Example: Awa saved Djo's account as «Djo»; Djo («Souleymane») sends her 2 000 XOF; `payment.received` has `sender_name="Souleymane"`, `sender_payee_name="Djo"`, and your bot decides which to show.

@@ -22,6 +22,20 @@ class PendingPayeeHeld(TypedDict):
     latest_expires_at: Optional[str]
 
 
+class PayeeVerifiedHolder(TypedDict):
+    """Field on every beneficiary item (list rows and create/get/update/favorite)
+    since bank B-80. Always sent by the bank, so typed required; read it with
+    ``.get("verified_holder_name")`` against an older bank.
+
+    The bank-verified holder as a quote shows it: first name plus last-name
+    initial ("Awa D."), never the full name. ``None`` for an external IBAN, a
+    pending phone request and a holder whose account is closed. ``name`` stays
+    the label the customer saved.
+    """
+
+    verified_holder_name: Optional[str]
+
+
 class BeneficiariesResource:
     """
     Beneficiaries resource for managing payment beneficiaries.
@@ -133,6 +147,8 @@ class BeneficiariesResource:
                 plus held_total_minor / held_count / earliest_expires_at /
                 latest_expires_at (B-46, :class:`PendingPayeeHeld`): what your
                 RESERVED deferred transfers to that number add up to.
+                Every item carries verified_holder_name (B-80,
+                :class:`PayeeVerifiedHolder`), None when the bank has none.
 
         Returns:
             BeneficiaryListResponse dict with keys:

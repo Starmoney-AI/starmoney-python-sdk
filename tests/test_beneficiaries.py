@@ -317,3 +317,10 @@ def test_handle_error_maps_duplicate_beneficiary_409():
     with pytest.raises(DuplicateResourceError) as ei:
         client._handle_error(resp)
     assert "already exists" in str(ei.value)
+
+
+def test_payee_verified_holder_typed_dict_has_the_key():
+    from starmoney.resources.beneficiaries import PayeeVerifiedHolder
+
+    assert set(PayeeVerifiedHolder.__annotations__) == {"verified_holder_name"}
+    assert PayeeVerifiedHolder.__required_keys__ == {"verified_holder_name"}
