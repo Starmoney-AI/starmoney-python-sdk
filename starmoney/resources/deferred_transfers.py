@@ -23,6 +23,10 @@ class _DeferredTransferAccountFields(TypedDict):
     # The recipient's account, in full (as on deferred_transfer.settled); null until
     # claimed. Mask it for display.
     recipient_account_reference: Optional[str]
+    # B-54: the recipient's first name once they have an account (the name
+    # deferred_transfer.settled carries); null before. Always sent; read with
+    # ``.get()`` against a bank older than B-54.
+    recipient_display_name: Optional[str]
 
 
 class DeferredTransferListItem(_DeferredTransferAccountFields):
@@ -41,8 +45,8 @@ class DeferredTransferListItem(_DeferredTransferAccountFields):
 
 
 class DeferredTransferRead(_DeferredTransferAccountFields):
-    """Account fields added to ``deferred_transfers.get(...)`` (B-56); the other
-    keys of the response are unchanged."""
+    """Account fields added to ``deferred_transfers.get(...)`` (B-56, and the
+    recipient's first name, B-54); the other keys of the response are unchanged."""
 
 
 class DeferredTransfersResource:
@@ -332,7 +336,9 @@ class DeferredTransfersResource:
               amount_minor, currency, status, created_at, expires_at,
               funding_source ('viban_hold' | 'external_pull'),
               sender_account_reference (null for external_pull),
-              recipient_account_reference (full, null until claimed; mask it).
+              recipient_account_reference (full, null until claimed; mask it),
+              recipient_display_name (the recipient's first name once they have
+              an account, else null).
               See :class:`DeferredTransferListItem`.
 
         Raises:

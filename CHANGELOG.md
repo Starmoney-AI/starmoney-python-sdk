@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- Transfer-detail fields (bank B-54), all additive and always sent (typed like `sender_name`; read with `.get()` against an older bank): `description: Optional[str]` on `PaymentInitiatedPayload`, `DeferredTransferSentPayload` and `DeferredTransferSettledPayload` (the sender's own wording; `None` when none, always `None` on the deferred events today); `motif: Optional[str]` on `PaymentReceivedPayload` (the inbound virement's libelle); `recipient_display_name: Optional[str]` on `DeferredTransferListItem` and `DeferredTransferRead` (the recipient's first name once they have an account). Example: Awa sends Moussa 5 000 XOF, motif «loyer»: her `payment.initiated` has `description="loyer"`, Moussa's `payment.received` has `motif="loyer"`, and her deferred row shows `recipient_display_name="Moussa"` once he has opened an account.
+
 ## [0.3.7] — 2026-11-04
 
 - `PaymentReceivedPayload` gains `sender_payee_id` / `sender_payee_name` (bank B-79; always sent, so typed like `sender_name`; read with `.get()` against an older bank): the recipient's own saved payee for the sender and its current name; `None` when unknown. `TransferHistoryRow.payee_id` / `payee_name` are now also set on `in` rows (the holder's payee for the payer's IBAN). Additive. Example: Awa saved Djo's account as «Djo»; Djo («Souleymane») sends her 2 000 XOF; `payment.received` has `sender_name="Souleymane"`, `sender_payee_name="Djo"`, and your bot decides which to show.

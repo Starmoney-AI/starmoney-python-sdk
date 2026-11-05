@@ -87,6 +87,10 @@ class _DeferredTransferSentPayloadRequired(TypedDict):
     currency: str
     sender_display_name: str
     notification_copy: str
+    # Bank B-54: the sender's own wording for the send. Always present on the
+    # wire; None today (a deferred send carries no motif). Read with ``.get()``
+    # against a bank older than B-54.
+    description: Optional[str]
     metadata: WebhookMetadata
 
 
@@ -124,6 +128,11 @@ class _PaymentReceivedPayloadRequired(TypedDict):
     # The sending bank's name (e.g. "SOCIETE GENERALE SENEGAL"); None on an
     # internal deferred-transfer claim credit.
     source_bank_name: Optional[str]
+    # Bank B-54: the inbound virement's motif (Eucalyptus ``libelle``), e.g.
+    # «loyer» when Awa pays Moussa 5 000 XOF from another bank. Always present on
+    # the wire, None when the credit carried none (a claim credit). Read with
+    # ``.get()`` against a bank older than B-54.
+    motif: Optional[str]
     # Bank B-79: the RECIPIENT's own active saved payee for the sender and its
     # current name, e.g. the «Djo» the recipient saved for a sender whose own
     # name is «Souleymane». Always present on the wire, None when the sender is
@@ -162,6 +171,9 @@ class _DeferredTransferSettledPayloadRequired(TypedDict):
     recipient_handle: Optional[str]  # the handle the sender addressed
     recipient_display_name: Optional[str]  # the recipient's first name
     recipient_user_id: Optional[str]
+    # Bank B-54: the sender's own wording; always present, None for a deferred
+    # transfer today. Read with ``.get()`` against a bank older than B-54.
+    description: Optional[str]
     metadata: WebhookMetadata
 
 
@@ -247,6 +259,10 @@ class _PaymentInitiatedPayloadRequired(TypedDict):
     beneficiary_name: str
     rail_name: str
     initiated_at: str
+    # Bank B-54: the sender's own wording for the send («loyer»). Always present
+    # on the wire; "Virement" when a quoted send had none, None on a deferred
+    # transfer's settle payment. Read with ``.get()`` against a bank older than B-54.
+    description: Optional[str]
     sm_reference: str  # StarMoney's reference for the customer to quote (0.3.0) — read this one
     customer_reference: str  # the same value under its 0.2.2 name; deprecated, dropped in 0.4.0
     metadata: WebhookMetadata
