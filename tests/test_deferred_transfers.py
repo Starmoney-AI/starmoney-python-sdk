@@ -34,6 +34,31 @@ _DT_RESPONSE = {
 
 
 @pytest.mark.asyncio
+async def test_send_passes_the_description_only_when_given():
+    """B-54: Awa sends 5 000 XOF to Moussa's number with «loyer»."""
+    resource, http = _make_resource()
+    mock_resp = MagicMock()
+    mock_resp.json.return_value = {**_DT_RESPONSE, "description": "loyer"}
+    http.post = AsyncMock(return_value=mock_resp)
+
+    out = await resource.send(
+        client_transaction_id="ctxn-1",
+        recipient_handle="+221770000001",
+        amount_minor=5000,
+        funding_source="viban_hold",
+        description="loyer",
+    )
+    assert http.post.call_args.kwargs["json"]["description"] == "loyer"
+    assert out["description"] == "loyer"
+
+    await resource.send(quote_id="q-1", client_transaction_id="ctxn-2", description="loyer")
+    assert http.post.call_args.kwargs["json"]["description"] == "loyer"
+
+    await resource.send(quote_id="q-1", client_transaction_id="ctxn-3")
+    assert "description" not in http.post.call_args.kwargs["json"]
+
+
+@pytest.mark.asyncio
 async def test_send_branch_a_body():
     resource, http = _make_resource()
     mock_resp = MagicMock()
