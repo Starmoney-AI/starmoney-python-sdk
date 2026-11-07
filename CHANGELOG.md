@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+## [0.3.9] — 2026-11-07
+
+- No SDK surface change. Version bumped in lockstep with the service (bank B-81: the name sent to BDK as `nomCredit` is resolved by the bank; `beneficiary_name` is still accepted on `payments.create` / `send_with_mandates`, and is ignored for the wire when the bank knows the recipient).
+
 ## [0.3.8] — 2026-11-05
 
 - Transfer-detail fields (bank B-54), all additive and always sent (typed like `sender_name`; read with `.get()` against an older bank): `description: Optional[str]` on `PaymentInitiatedPayload`, `DeferredTransferSentPayload` and `DeferredTransferSettledPayload` (the sender's own wording; `None` when none); `motif: Optional[str]` on `PaymentReceivedPayload` (the inbound virement's libelle); `recipient_display_name: Optional[str]` on `DeferredTransferListItem` and `DeferredTransferRead` (the recipient's first name once they have an account). Example: Awa sends Moussa 5 000 XOF, motif «loyer»: her `payment.initiated` has `description="loyer"`, Moussa's `payment.received` has `motif="loyer"`, and her deferred row shows `recipient_display_name="Moussa"` once he has opened an account.
