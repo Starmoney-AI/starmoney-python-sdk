@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+## [0.3.12] — 2026-11-08
+
+- No SDK surface change. Version bumped in lockstep with the service (bank B-82: the stage wipe handles the append-only mandate tables; nothing on the API).
+
 ## [0.3.11] — 2026-11-08
 
 - No SDK surface change. Version bumped in lockstep with the service (bank B-82: the test-number wipe has a single trigger; nothing on the API).
