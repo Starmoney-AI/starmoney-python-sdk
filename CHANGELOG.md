@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+## [0.3.10] — 2026-11-08
+
+- No SDK surface change. Version bumped in lockstep with the service (bank B-82: stage-only wipe of the on-app test numbers; nothing on the API).
+
 ## [0.3.9] — 2026-11-07
 
 - No SDK surface change. Version bumped in lockstep with the service (bank B-81: the name sent to BDK as `nomCredit` is resolved by the bank; `beneficiary_name` is still accepted on `payments.create` / `send_with_mandates`, and is ignored for the wire when the bank knows the recipient).
