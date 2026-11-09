@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+## [0.3.13] — 2026-11-09
+
+- **B-58: the linked account's IBAN.** `accounts.link_rail(user_id, rail_name, account_reference=…)` forwards the IBAN the holder gave as the optional body of `POST /accounts/rails/{rail_name}` (works on an already-linked rail too); new `accounts.set_rail_account_reference(user_id, rail_name, account_reference)` → `PUT /accounts/rails/{rail_name}/account`, returns `{display_name, account_reference, account_reference_masked}`. A mistyped IBAN raises `InvalidIBANError` (422 `INVALID_IBAN`, `errors[0].field == "account_reference"`); a rail with nothing linked raises the SDK's 404 class (`RAIL_NOT_LINKED`). `get_user_available_rails` now returns the captured IBAN full and masked on `account`; both stay `None` until the holder gives it. Never a balance.
+
 ## [0.3.12] — 2026-11-08
 
 - No SDK surface change. Version bumped in lockstep with the service (bank B-82: the stage wipe handles the append-only mandate tables; nothing on the API).

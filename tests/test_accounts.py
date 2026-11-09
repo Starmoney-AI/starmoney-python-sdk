@@ -307,3 +307,71 @@ async def test_resolve_self_calls_the_user_scoped_path():
     http.get.assert_called_once_with("/accounts/resolve-self", user_id="user-1")
     assert result["accounts"][0]["account_reference"].startswith("SN12")
     assert result["display_name"] == "Awa"
+
+
+# ---------------------------------------------------------------------------
+# B-58 — the linked account's IBAN (service 0.3.13)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_link_rail_without_reference_sends_no_body():
+    resource, http = _make_resource()
+    mock_resp = MagicMock()
+    mock_resp.json.return_value = {"status": "already_linked", "rail_name": "BDK"}
+    http.post = AsyncMock(return_value=mock_resp)
+
+    await resource.link_rail("user-1", rail_name="BDK")
+
+    assert http.post.call_args.args[0] == "/accounts/rails/BDK"
+    assert "json" not in http.post.call_args.kwargs
+    assert http.post.call_args.kwargs["user_id"] == "user-1"
+
+
+@pytest.mark.asyncio
+async def test_link_rail_forwards_the_account_reference():
+    resource, http = _make_resource()
+    mock_resp = MagicMock()
+    mock_resp.json.return_value = {
+        "status": "already_linked",
+        "rail_name": "BDK",
+        "account": {
+            "display_name": "BDK",
+            "account_reference": "SN11K00200152000000000000777",
+            "account_reference_masked": "SN……0777",
+        },
+    }
+    http.post = AsyncMock(return_value=mock_resp)
+
+    result = await resource.link_rail(
+        "user-1", rail_name="BDK", account_reference="SN11 K002 0015 2000 0000 0000 0777"
+    )
+
+    assert http.post.call_args.kwargs["json"] == {
+        "account_reference": "SN11 K002 0015 2000 0000 0000 0777"
+    }
+    assert result["account"]["account_reference_masked"] == "SN……0777"
+
+
+@pytest.mark.asyncio
+async def test_set_rail_account_reference_puts_the_iban_user_scoped():
+    resource, http = _make_resource()
+    mock_resp = MagicMock()
+    mock_resp.json.return_value = {
+        "display_name": "BDK",
+        "account_reference": "SN11K00200152000000000000777",
+        "account_reference_masked": "SN……0777",
+    }
+    http.put = AsyncMock(return_value=mock_resp)
+
+    result = await resource.set_rail_account_reference(
+        "user-1", "BDK", "SN11 K002 0015 2000 0000 0000 0777"
+    )
+
+    http.put.assert_awaited_once_with(
+        "/accounts/rails/BDK/account",
+        user_id="user-1",
+        json={"account_reference": "SN11 K002 0015 2000 0000 0000 0777"},
+    )
+    assert result["account_reference"] == "SN11K00200152000000000000777"
+    assert "balance" not in result

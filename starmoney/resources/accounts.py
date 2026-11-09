@@ -108,23 +108,83 @@ class AccountsResource:
         response = await self.http.post("/accounts", json=payload)
         return response.json()
 
-    async def link_rail(self, user_id: str, rail_name: str = "BDK") -> dict[str, Any]:
+    async def link_rail(
+        self,
+        user_id: str,
+        rail_name: str = "BDK",
+        *,
+        account_reference: Optional[str] = None,
+    ) -> dict[str, Any]:
         """
         Link a payment rail to user's account.
 
         Args:
             user_id: User ID to link rail to
             rail_name: Payment rail name (default: 'BDK')
+            account_reference: B-58 (service 0.3.13) — the IBAN of the account
+                being linked, as the holder typed it. Mod-97 checked by the
+                bank (``InvalidIBANError`` / 422 ``INVALID_IBAN`` with
+                ``errors[0].field == "account_reference"``), stored in clear
+                beside the credentials, returned on the rails listing as
+                ``account.account_reference`` (full) and
+                ``account.account_reference_masked`` (``SN……2706``). On an
+                already-linked rail it is recorded on the existing row.
 
         Returns:
-            Rail link confirmation data
+            Rail link confirmation data; ``account`` is the listing's
+            ``{display_name, account_reference, account_reference_masked}``
+            once credentials exist, else absent/None. Never a balance.
 
         Example:
             ```python
-            await client.accounts.link_rail(user_id, rail_name="BDK")
+            await client.accounts.link_rail(
+                user_id, rail_name="BDK", account_reference="SN11 K002 0015 …"
+            )
             ```
         """
-        response = await self.http.post(f"/accounts/rails/{rail_name}", user_id=user_id)
+        payload: dict[str, Any] = {}
+        if account_reference is not None:
+            payload["account_reference"] = account_reference
+        kwargs: dict[str, Any] = {"json": payload} if payload else {}
+        response = await self.http.post(f"/accounts/rails/{rail_name}", user_id=user_id, **kwargs)
+        return response.json()
+
+    async def set_rail_account_reference(self, user_id: str, rail_name: str, account_reference: str) -> dict[str, Any]:
+        """
+        Record (or correct) the IBAN of the account linked on a rail (B-58).
+
+        For a holder whose BDK account was linked before the IBAN was captured,
+        the app asks once and calls this; the bank then returns it on the rails
+        listing so home can show «Compte BDK · SN11 …».
+
+        Args:
+            user_id: The holder (user-scoped auth; the holder names their own
+                account only)
+            rail_name: Payment rail name, e.g. 'BDK'
+            account_reference: The IBAN as the holder typed it (spaces fine)
+
+        Returns:
+            ``{"display_name", "account_reference", "account_reference_masked"}``
+
+        Raises:
+            InvalidIBANError: 422 ``INVALID_IBAN`` — the IBAN fails
+                shape/country/length or the mod-97 check; nothing stored.
+            PaymentNotFoundError: the SDK's 404 class — ``RAIL_NOT_LINKED``, the
+                holder has no linked account on that rail; link first.
+
+        Example:
+            ```python
+            acct = await client.accounts.set_rail_account_reference(
+                user_id, "BDK", "SN11 K002 0015 2000 0000 0000 0777"
+            )
+            acct["account_reference_masked"]  # "SN……2706"
+            ```
+        """
+        response = await self.http.put(
+            f"/accounts/rails/{rail_name}/account",
+            user_id=user_id,
+            json={"account_reference": account_reference},
+        )
         return response.json()
 
     async def get_transfer_history(
@@ -247,9 +307,10 @@ class AccountsResource:
             - available_rails: List of rails with name, display info, and credential status.
               Each item carries ``account``: ``{"display_name", "account_reference", "account_reference_masked"}``
               when an account is linked on that rail (e.g. ``{"display_name": "BDK",
-              "account_reference": None, "account_reference_masked": None}``), else ``None`` — grey that row out.
-              both references stay ``None`` until the IBAN is captured at
-              linking (later release); never a balance.
+              "account_reference": "SN11K002…0777", "account_reference_masked": "SN……2706"}``),
+              else ``None`` — grey that row out. Both references are ``None`` until the
+              holder gives the IBAN (``link_rail(account_reference=…)`` or
+              ``set_rail_account_reference``, service 0.3.13); never a balance.
             - total_rails: Total number of rails
             - configured_rails: Number of rails with stored credentials
 
