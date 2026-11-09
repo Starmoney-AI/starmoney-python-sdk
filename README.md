@@ -108,6 +108,12 @@ account = await client.accounts.create(
 
 # Link payment rail
 await client.accounts.link_rail(user_id, rail_name="BDK")
+
+# Record the IBAN of the linked BDK account (the holder types it once; mod-97 checked).
+# GET /v1/accounts/rails then returns it as account.account_reference / account_reference_masked.
+await client.accounts.set_rail_account_reference(
+    user_id, "BDK", "SN11 K002 0015 2000 0000 0000 0777"
+)
 ```
 
 ### Beneficiaries
