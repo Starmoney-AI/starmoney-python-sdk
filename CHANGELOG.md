@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+## [0.3.15] — 2026-11-09
+
+- Lockstep with the service. No SDK code change. Webhook envelopes now carry `metadata.delivery_id` / `metadata.delivery_attempt` inside the signed body (same values as the two `X-StarMoney-*` delivery headers); `WebhookEvent` exposes them through `metadata` as before.
+
 ## [0.3.14] — 2026-11-09
 
 - Lockstep with the service. No SDK code change. The service now sends `X-StarMoney-Event-Id` (stable across retries of one delivery) and `X-StarMoney-Delivery-Attempt` on every webhook POST; read them from your request headers next to `X-StarMoney-Signature` and dedupe on the id.
