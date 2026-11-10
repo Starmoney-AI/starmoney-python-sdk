@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+## [0.3.17] — 2026-11-10
+
+- B-91: `starmoney.PaymentFailureReason` (closed set `payee_name_too_long` · `payee_account_invalid` · `insufficient_funds` · `rail_not_linked` · `bank_unreachable` · `bank_refused_other` · `technical`). `payment.failed` payloads type the new `failure_reason` and optional `bank_message`. A beneficiary `name` over 30 characters now raises the SDK's validation error (`rule="field.too_long"`, `expected="30"`).
+
 ## [0.3.16] — 2026-11-10
 
 - B-90: `starmoney.HolderStatus` (closed set `none` · `invited` · `opening` · `unchecked` · `checking` · `verified` · `closed`, with `.can_send` / `.has_account`). `accounts.get_status` now returns `holder_status` and `can_send`; new `accounts.get_status_by_phone(phone)` (service-scoped) for a number you have no user_id for. Status only, never a balance.

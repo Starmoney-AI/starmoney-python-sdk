@@ -55,6 +55,19 @@ FundsOutcome = Literal["not_debited", "debited_under_review", "returned"]
 # vocabulary; never renamed.
 FeeRefundMarker = Literal["pending"]
 
+# B-91 (0.3.17): why a payment failed, one closed word decided by the bank (see
+# docs/ERRORS.md "payment.failed reasons"). Never renamed; a new BDK refusal is
+# ``bank_refused_other`` (with ``bank_message``) until it earns its own value.
+PaymentFailureReason = Literal[
+    "payee_name_too_long",
+    "payee_account_invalid",
+    "insufficient_funds",
+    "rail_not_linked",
+    "bank_unreachable",
+    "bank_refused_other",
+    "technical",
+]
+
 
 class FeeRefundLine(TypedDict):
     """One refunded fee line on ``payment.fee_refunded`` — the same
@@ -311,6 +324,7 @@ class _PaymentRailFailedPayloadRequired(TypedDict):
     sm_reference: str  # StarMoney's reference for the customer to quote (0.3.0) — read this one
     customer_reference: str  # the same value under its 0.2.2 name; deprecated, dropped in 0.4.0
     funds: FundsOutcome  # B-49: "not_debited" here, or "debited_under_review" after a ledger refusal
+    failure_reason: PaymentFailureReason  # B-91: show this, not ``error``
     metadata: WebhookMetadata
 
 
@@ -326,6 +340,9 @@ class PaymentRailFailedPayload(_PaymentRailFailedPayloadRequired, total=False):
 
     client_reference: str  # ADR-004: only present when the caller supplied one
     deferred_transfer_id: str  # only on a deferred transfer's settle payment
+    # B-91: BDK's own words, only when BDK wrote any (≤ 200 characters, French).
+    # For support and logs; the customer message keys off ``failure_reason``.
+    bank_message: str
     # The fee line (transfer routes, 0.3.0): present only when the send confirmed
     # a quote (POST /v1/payments with quote_id); absent on a legacy send. Same
     # keys and meaning as :class:`FeeLine`.
@@ -367,6 +384,10 @@ class PaymentBankStatusPayload(_PaymentBankStatusPayloadRequired, total=False):
     # B-49: on payment.failed only — the bank had accepted, so always
     # "debited_under_review" on this path.
     funds: FundsOutcome
+    # B-91: on payment.failed only — the closed reason, and BDK's own words when
+    # its record carried any.
+    failure_reason: PaymentFailureReason
+    bank_message: str
     # Present (always "pending") only when the fee of a quoted vIBAN send is
     # being refunded after the bank's refusal; payment.fee_refunded follows.
     fee_refund: FeeRefundMarker
@@ -530,6 +551,7 @@ __all__ = [
     "WebhookMetadata",
     "FeeLine",
     "FundsOutcome",
+    "PaymentFailureReason",
     "FeeRefundMarker",
     "FeeRefundLine",
     "BeneficiaryAddedPayload",
