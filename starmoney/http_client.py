@@ -29,6 +29,9 @@ from .exceptions import (
     NoVibanAccountError,
     AccountNotPayableError,
     LedgerUnavailableError,
+    LinkedAccountReferenceMissingError,
+    LinkedAccountRejectedError,
+    BankUnavailableError,
     UP3_ERROR_CODE_MAP,
     UP3Error,
 )
@@ -159,6 +162,12 @@ class HTTPClient:
             raise AccountNotPayableError(response.status_code, message, error_data)
         if error_code == "LEDGER_UNAVAILABLE":
             raise LedgerUnavailableError(response.status_code, message, error_data)
+        if error_code == "LINKED_ACCOUNT_REFERENCE_MISSING":
+            raise LinkedAccountReferenceMissingError(response.status_code, message, error_data)
+        if error_code == "LINKED_ACCOUNT_REJECTED":
+            raise LinkedAccountRejectedError(response.status_code, message, error_data)
+        if error_code == "BANK_UNAVAILABLE":
+            raise BankUnavailableError(response.status_code, message, error_data)
 
         # Check for UP3 error codes embedded in the detail string or error_code field.
         # The API returns UP3_* codes in either `detail` or an `error_code` field.

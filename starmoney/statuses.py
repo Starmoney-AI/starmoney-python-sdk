@@ -56,6 +56,9 @@ class AccountState(str, Enum):
 class HolderStatus(str, Enum):
     """``holder_status`` (B-90): the bank-defined word to show a customer.
 
+    Deprecated since 0.3.18: read ``account_status`` + ``verification_status``
+    (B-94, ``AccountStatus`` / ``VerificationStatus``) instead.
+
     On GET /v1/accounts/status and GET /v1/accounts/status/by-phone/{phone}.
     Derived from ``account_state``; the bank owns the set, consumers map to it
     and infer nothing. ``can_send`` rides next to it on both reads.
@@ -76,6 +79,30 @@ class HolderStatus(str, Enum):
     @property
     def has_account(self) -> bool:
         return self not in (HolderStatus.NONE, HolderStatus.INVITED)
+
+
+class AccountStatus(str, Enum):
+    """``account_status`` (B-94): the account's own status, market-standard words.
+
+    On both status reads, next to ``verification_status``. Example: Awa opens her
+    account → active / not_started (she sends under the pre-KYC limits); she sends
+    her ID → active / pending; BDK approves → active / verified, no limits.
+    """
+
+    NONE = "none"  # the bank knows nothing about this phone / user
+    INVITED = "invited"  # no account; another holder is waiting on this number
+    PENDING = "pending"  # account opening; no vIBAN yet
+    ACTIVE = "active"  # vIBAN live (can_send says whether it may send now)
+    CLOSED = "closed"  # terminal
+
+
+class VerificationStatus(str, Enum):
+    """``verification_status`` (B-94): the identity check (KYC). Null when there
+    is no account to check (``account_status`` none or closed)."""
+
+    NOT_STARTED = "not_started"  # no documents yet; pre-KYC limits apply
+    PENDING = "pending"  # documents with the bank; pre-KYC limits apply
+    VERIFIED = "verified"  # identity checked; no limits
 
 
 class DeferredTransferStatus(str, Enum):

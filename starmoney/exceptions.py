@@ -246,6 +246,29 @@ class LedgerUnavailableError(ServerError):
     pass
 
 
+class LinkedAccountReferenceMissingError(APIError):
+    """409 - the linked BDK account's IBAN was never given, so its balance cannot be
+    read (``error_code == "LINKED_ACCOUNT_REFERENCE_MISSING"``). Ask the holder once
+    and save it with ``accounts.set_rail_account_reference``, then read again. B-92."""
+
+    pass
+
+
+class LinkedAccountRejectedError(APIError):
+    """409 - BDK refused the saved IBAN for the holder's contract
+    (``error_code == "LINKED_ACCOUNT_REJECTED"``): it is not the account those
+    credentials open. The holder corrects it. B-92."""
+
+    pass
+
+
+class BankUnavailableError(ServerError):
+    """503 - BDK could not be read (``error_code == "BANK_UNAVAILABLE"``).
+    Transient: retry later. B-92."""
+
+    pass
+
+
 class InvalidSignatureError(StarmoneyError):
     """Webhook signature validation failed."""
 

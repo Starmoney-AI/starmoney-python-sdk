@@ -51,7 +51,8 @@ Webhook Validation:
 """
 
 from .client import StarmoneyClient
-from .statuses import (AccountState, DeferredTransferStatus, HolderStatus,
+from .statuses import (AccountState, AccountStatus, DeferredTransferStatus, HolderStatus,
+                       VerificationStatus,
                        PaymentResponseStatus)
 from .exceptions import (
     APIError,
@@ -69,6 +70,9 @@ from .exceptions import (
     NoVibanAccountError,
     AccountNotPayableError,
     LedgerUnavailableError,
+    LinkedAccountReferenceMissingError,
+    LinkedAccountRejectedError,
+    BankUnavailableError,
     StarmoneyError,
     ValidationError,
     # UP3 typed exceptions
@@ -138,6 +142,8 @@ __all__ = [
     "PaymentResponseStatus",
     "AccountState",
     "HolderStatus",
+    "AccountStatus",
+    "VerificationStatus",
     "DeferredTransferStatus",
     "StarmoneyClient",
     "WebhookValidator",
@@ -186,6 +192,9 @@ __all__ = [
     "NoVibanAccountError",
     "AccountNotPayableError",
     "LedgerUnavailableError",
+    "LinkedAccountReferenceMissingError",
+    "LinkedAccountRejectedError",
+    "BankUnavailableError",
     "InvalidSignatureError",
     # UP3 exceptions
     "UP3Error",

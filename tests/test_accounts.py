@@ -401,3 +401,12 @@ async def test_set_rail_account_reference_puts_the_iban_user_scoped():
     )
     assert result["account_reference"] == "SN11K00200152000000000000777"
     assert "balance" not in result
+
+
+def test_account_and_verification_status_enums_b94():
+    from starmoney import AccountStatus, VerificationStatus
+
+    assert {s.value for s in AccountStatus} == {"none", "invited", "pending", "active", "closed"}
+    assert {s.value for s in VerificationStatus} == {"not_started", "pending", "verified"}
+    assert AccountStatus("active") is AccountStatus.ACTIVE
+    assert VerificationStatus("not_started") is VerificationStatus.NOT_STARTED

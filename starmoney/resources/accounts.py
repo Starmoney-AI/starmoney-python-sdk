@@ -354,7 +354,11 @@ class AccountsResource:
               - limits_lifted: bool — True once verified (« sans limite »).
               - holder_status: 'opening' | 'unchecked' | 'checking' | 'verified'
                 | 'closed' — the bank-defined word to show (B-90, 0.3.16);
-                parse with ``starmoney.HolderStatus``.
+                parse with ``starmoney.HolderStatus``. Deprecated: read the two below.
+              - account_status: 'pending' | 'active' | 'closed' (B-94, 0.3.18;
+                ``starmoney.AccountStatus``)
+              - verification_status: 'not_started' | 'pending' | 'verified' | None
+                (B-94; ``starmoney.VerificationStatus``)
               - can_send: bool — unchecked/checking under ``limits``, verified without.
 
             ``account_state`` is a closed set; parse it with
@@ -383,7 +387,12 @@ class AccountsResource:
             dict with keys:
               - phone_number: the number normalised to E.164
               - holder_status: 'none' | 'invited' | 'opening' | 'unchecked'
-                | 'checking' | 'verified' | 'closed' (``starmoney.HolderStatus``)
+                | 'checking' | 'verified' | 'closed' (``starmoney.HolderStatus``;
+                deprecated, read the two below)
+              - account_status: 'none' | 'invited' | 'pending' | 'active' | 'closed'
+                (B-94, ``starmoney.AccountStatus``)
+              - verification_status: 'not_started' | 'pending' | 'verified' | None
+                (B-94, ``starmoney.VerificationStatus``)
               - can_send: bool
               - account_state: the account_state value, or None when no holder
               - invited_at: ISO datetime | None (for invited)
@@ -447,6 +456,31 @@ class AccountsResource:
             LedgerUnavailableError (503): the ledger could not be read; retry.
         """
         response = await self.http.get("/accounts/balance", user_id=user_id)
+        return response.json()
+
+    async def get_linked_balance(self, user_id: str, rail_name: str = "bdk") -> dict[str, Any]:
+        """
+        The balance of the holder's linked BDK account, read live from BDK (B-92).
+
+        Show ``available_minor`` (BDK's available balance, owner 10 Nov 2026).
+        ``balance_minor`` is BDK's booked balance and ``reserved_minor`` the part
+        BDK holds. Read-through: nothing is stored server-side. Only ``bdk``.
+        Example: available 1 536 228, booked 1 711 576, reserved 175 348.
+
+        Auth: user-scoped JWT (``user_id`` mints the sub claim).
+
+        Returns:
+            dict with the same keys as ``get_balance``: account_reference (the
+            linked IBAN), available_minor, reserved_minor, balance_minor,
+            currency, as_of.
+
+        Raises:
+            PaymentNotFoundError (404, ``RAIL_NOT_LINKED``): no linked account.
+            LinkedAccountReferenceMissingError (409): the IBAN was never given.
+            LinkedAccountRejectedError (409): BDK refused the saved IBAN.
+            BankUnavailableError (503): BDK could not be read; retry.
+        """
+        response = await self.http.get(f"/accounts/rails/{rail_name}/balance", user_id=user_id)
         return response.json()
 
     async def submit_kyc(

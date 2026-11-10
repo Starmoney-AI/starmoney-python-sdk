@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+## [0.3.18] — 2026-11-10
+
+- B-92: `accounts.get_linked_balance(user_id, rail_name="bdk")` reads the linked BDK account's balance through from BDK. Show `available_minor`. New typed errors: `LinkedAccountReferenceMissingError` (409), `LinkedAccountRejectedError` (409), `BankUnavailableError` (503, a `ServerError`).
+- B-94: `starmoney.AccountStatus` (`none` · `invited` · `pending` · `active` · `closed`) and `starmoney.VerificationStatus` (`not_started` · `pending` · `verified`). Both status reads return `account_status` and `verification_status`. `HolderStatus` is deprecated.
+
 ## [0.3.17] — 2026-11-10
 
 - B-91: `starmoney.PaymentFailureReason` (closed set `payee_name_too_long` · `payee_account_invalid` · `insufficient_funds` · `rail_not_linked` · `bank_unreachable` · `bank_refused_other` · `technical`). `payment.failed` payloads type the new `failure_reason` and optional `bank_message`. A beneficiary `name` over 30 characters now raises the SDK's validation error (`rule="field.too_long"`, `expected="30"`).
