@@ -129,11 +129,25 @@ class AccountsResource:
                 ``account.account_reference`` (full) and
                 ``account.account_reference_masked`` (``SN……2706``). On an
                 already-linked rail it is recorded on the existing row.
+                B-95 (service 0.3.19): REQUIRED on a first BDK link — the
+                bank links the account it has registered for the holder's
+                phone + this IBAN, after BDK confirms it. The BDK login
+                never leaves the bank.
 
         Returns:
             Rail link confirmation data; ``account`` is the listing's
             ``{display_name, account_reference, account_reference_masked}``
             once credentials exist, else absent/None. Never a balance.
+
+        Raises:
+            InvalidIBANError: 422 ``INVALID_IBAN`` — bad IBAN, or none given
+                on a first BDK link (``errors[0].rule == "field.required"``).
+            LinkableAccountNotFoundError: 404 — no registered account for
+                this phone + IBAN (one answer for «not registered» and
+                «another phone»).
+            LinkVerificationFailedError: 409 — the registered account did not
+                verify at BDK.
+            BankUnavailableError: 503 — BDK could not be reached; retry.
 
         Example:
             ```python
@@ -147,6 +161,29 @@ class AccountsResource:
             payload["account_reference"] = account_reference
         kwargs: dict[str, Any] = {"json": payload} if payload else {}
         response = await self.http.post(f"/accounts/rails/{rail_name}", user_id=user_id, **kwargs)
+        return response.json()
+
+    async def unlink_rail(self, user_id: str, rail_name: str = "BDK") -> dict[str, Any]:
+        """
+        Undo the holder's link on a rail (B-95, service 0.3.19).
+
+        The bank deactivates the link (kept for audit); the rails listing then
+        shows ``has_credentials: false`` and the linked balance answers
+        ``RAIL_NOT_LINKED``. The holder can link the same IBAN again.
+
+        Returns:
+            ``{"rail_name": "bdk", "status": "unlinked"}``
+
+        Raises:
+            PaymentNotFoundError: the SDK's 404 class — ``RAIL_NOT_LINKED``,
+                nothing is linked on that rail.
+
+        Example:
+            ```python
+            await client.accounts.unlink_rail(user_id)  # BDK
+            ```
+        """
+        response = await self.http.delete(f"/accounts/rails/{rail_name}", user_id=user_id)
         return response.json()
 
     async def set_rail_account_reference(self, user_id: str, rail_name: str, account_reference: str) -> dict[str, Any]:

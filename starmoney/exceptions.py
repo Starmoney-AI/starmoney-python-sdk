@@ -269,6 +269,23 @@ class BankUnavailableError(ServerError):
     pass
 
 
+class LinkableAccountNotFoundError(APIError):
+    """404 - no registered account lets this holder link this IBAN
+    (``error_code == "LINKABLE_ACCOUNT_NOT_FOUND"``). One answer for «not
+    registered» and «registered to another phone number». The holder checks
+    the IBAN; nothing was stored. B-95."""
+
+    pass
+
+
+class LinkVerificationFailedError(APIError):
+    """409 - the registered account did not verify at BDK
+    (``error_code == "LINK_VERIFICATION_FAILED"``). A bank-side data problem:
+    tell the holder to try later; nothing was stored. B-95."""
+
+    pass
+
+
 class InvalidSignatureError(StarmoneyError):
     """Webhook signature validation failed."""
 

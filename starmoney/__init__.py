@@ -73,6 +73,8 @@ from .exceptions import (
     LinkedAccountReferenceMissingError,
     LinkedAccountRejectedError,
     BankUnavailableError,
+    LinkableAccountNotFoundError,
+    LinkVerificationFailedError,
     StarmoneyError,
     ValidationError,
     # UP3 typed exceptions
@@ -195,6 +197,8 @@ __all__ = [
     "LinkedAccountReferenceMissingError",
     "LinkedAccountRejectedError",
     "BankUnavailableError",
+    "LinkableAccountNotFoundError",
+    "LinkVerificationFailedError",
     "InvalidSignatureError",
     # UP3 exceptions
     "UP3Error",

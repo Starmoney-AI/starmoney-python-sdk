@@ -32,6 +32,8 @@ from .exceptions import (
     LinkedAccountReferenceMissingError,
     LinkedAccountRejectedError,
     BankUnavailableError,
+    LinkableAccountNotFoundError,
+    LinkVerificationFailedError,
     UP3_ERROR_CODE_MAP,
     UP3Error,
 )
@@ -168,6 +170,10 @@ class HTTPClient:
             raise LinkedAccountRejectedError(response.status_code, message, error_data)
         if error_code == "BANK_UNAVAILABLE":
             raise BankUnavailableError(response.status_code, message, error_data)
+        if error_code == "LINKABLE_ACCOUNT_NOT_FOUND":
+            raise LinkableAccountNotFoundError(response.status_code, message, error_data)
+        if error_code == "LINK_VERIFICATION_FAILED":
+            raise LinkVerificationFailedError(response.status_code, message, error_data)
 
         # Check for UP3 error codes embedded in the detail string or error_code field.
         # The API returns UP3_* codes in either `detail` or an `error_code` field.

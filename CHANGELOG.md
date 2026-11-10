@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+## [0.3.19] — 2026-11-10
+
+- B-95: `accounts.link_rail(user_id, account_reference=IBAN)` links BDK from the bank's registry of linkable accounts (the IBAN is required on a first link). New `accounts.unlink_rail(user_id, rail_name="BDK")`. New typed errors: `LinkableAccountNotFoundError` (404) and `LinkVerificationFailedError` (409); `BankUnavailableError` (503) as in B-92.
+
 ## [0.3.18] — 2026-11-10
 
 - B-92: `accounts.get_linked_balance(user_id, rail_name="bdk")` reads the linked BDK account's balance through from BDK. Show `available_minor`. New typed errors: `LinkedAccountReferenceMissingError` (409), `LinkedAccountRejectedError` (409), `BankUnavailableError` (503, a `ServerError`).
