@@ -53,6 +53,31 @@ class AccountState(str, Enum):
         )
 
 
+class HolderStatus(str, Enum):
+    """``holder_status`` (B-90): the bank-defined word to show a customer.
+
+    On GET /v1/accounts/status and GET /v1/accounts/status/by-phone/{phone}.
+    Derived from ``account_state``; the bank owns the set, consumers map to it
+    and infer nothing. ``can_send`` rides next to it on both reads.
+    """
+
+    NONE = "none"  # the bank knows nothing about this phone / user
+    INVITED = "invited"  # no account; another holder is waiting on this number
+    OPENING = "opening"  # account creation started (captured); no vIBAN yet
+    UNCHECKED = "unchecked"  # vIBAN live; identity check not done; sends under limits
+    CHECKING = "checking"  # documents with the bank; sends under limits
+    VERIFIED = "verified"  # identity check done; no limits
+    CLOSED = "closed"  # terminal
+
+    @property
+    def can_send(self) -> bool:
+        return self in (HolderStatus.UNCHECKED, HolderStatus.CHECKING, HolderStatus.VERIFIED)
+
+    @property
+    def has_account(self) -> bool:
+        return self not in (HolderStatus.NONE, HolderStatus.INVITED)
+
+
 class DeferredTransferStatus(str, Enum):
     """``status`` of a deferred transfer (send / claim / list / status reads).
 

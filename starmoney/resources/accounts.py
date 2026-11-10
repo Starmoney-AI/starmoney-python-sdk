@@ -352,6 +352,10 @@ class AccountsResource:
               - limits: list — the send limits binding the holder while the
                 bank has not verified them; [] once verified. See get_limits().
               - limits_lifted: bool — True once verified (« sans limite »).
+              - holder_status: 'opening' | 'unchecked' | 'checking' | 'verified'
+                | 'closed' — the bank-defined word to show (B-90, 0.3.16);
+                parse with ``starmoney.HolderStatus``.
+              - can_send: bool — unchecked/checking under ``limits``, verified without.
 
             ``account_state`` is a closed set; parse it with
             ``starmoney.AccountState``.
@@ -361,6 +365,33 @@ class AccountsResource:
             AuthenticationError (401): user_id missing or JWT invalid.
         """
         response = await self.http.get("/accounts/status", user_id=user_id)
+        return response.json()
+
+    async def get_status_by_phone(self, phone_number: str) -> Dict[str, Any]:
+        """
+        What is this phone number to the bank? (B-90, service-scoped, 0.3.16)
+
+        For a number you have no user_id for — the «invited» case: another
+        holder sent money to it or asked to add it as a beneficiary, and no
+        account exists yet. Returns STATE only: no name, no user_id, never a
+        balance.
+
+        Args:
+            phone_number: any format the bank can parse (E.164 preferred).
+
+        Returns:
+            dict with keys:
+              - phone_number: the number normalised to E.164
+              - holder_status: 'none' | 'invited' | 'opening' | 'unchecked'
+                | 'checking' | 'verified' | 'closed' (``starmoney.HolderStatus``)
+              - can_send: bool
+              - account_state: the account_state value, or None when no holder
+              - invited_at: ISO datetime | None (for invited)
+
+        Raises:
+            ValidationError (422): the number cannot be parsed.
+        """
+        response = await self.http.get(f"/accounts/status/by-phone/{phone_number}")
         return response.json()
 
     async def get_limits(self, user_id: str) -> list[dict[str, Any]]:

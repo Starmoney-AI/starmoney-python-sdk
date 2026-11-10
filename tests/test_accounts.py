@@ -101,6 +101,32 @@ async def test_get_status_calls_correct_path_with_user_token():
     assert "balance" not in result
 
 
+@pytest.mark.asyncio
+async def test_get_status_by_phone_is_service_scoped_and_returns_the_bank_word():
+    from starmoney import HolderStatus
+
+    resource, http = _make_resource()
+    mock_resp = MagicMock()
+    mock_resp.json.return_value = {
+        "phone_number": "+221771234567",
+        "holder_status": "invited",
+        "can_send": False,
+        "account_state": None,
+        "invited_at": "2026-11-10T09:00:00Z",
+    }
+    http.get = AsyncMock(return_value=mock_resp)
+
+    result = await resource.get_status_by_phone("+221771234567")
+
+    http.get.assert_called_once_with("/accounts/status/by-phone/+221771234567")
+    status = HolderStatus(result["holder_status"])
+    assert status is HolderStatus.INVITED
+    assert status.can_send is False and status.has_account is False
+    assert HolderStatus.UNCHECKED.can_send and HolderStatus.VERIFIED.can_send
+    assert HolderStatus.OPENING.can_send is False
+    assert "balance" not in result
+
+
 # ---------------------------------------------------------------------------
 # submit_kyc
 # ---------------------------------------------------------------------------

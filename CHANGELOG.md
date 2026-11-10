@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+## [0.3.16] — 2026-11-10
+
+- B-90: `starmoney.HolderStatus` (closed set `none` · `invited` · `opening` · `unchecked` · `checking` · `verified` · `closed`, with `.can_send` / `.has_account`). `accounts.get_status` now returns `holder_status` and `can_send`; new `accounts.get_status_by_phone(phone)` (service-scoped) for a number you have no user_id for. Status only, never a balance.
+
 ## [0.3.15] — 2026-11-09
 
 - Lockstep with the service. No SDK code change. Webhook envelopes now carry `metadata.delivery_id` / `metadata.delivery_attempt` inside the signed body (same values as the two `X-StarMoney-*` delivery headers); `WebhookEvent` exposes them through `metadata` as before.

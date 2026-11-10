@@ -51,7 +51,8 @@ Webhook Validation:
 """
 
 from .client import StarmoneyClient
-from .statuses import AccountState, DeferredTransferStatus, PaymentResponseStatus
+from .statuses import (AccountState, DeferredTransferStatus, HolderStatus,
+                       PaymentResponseStatus)
 from .exceptions import (
     APIError,
     AuthenticationError,
@@ -135,6 +136,7 @@ except PackageNotFoundError:  # running from an uninstalled source checkout
 __all__ = [
     "PaymentResponseStatus",
     "AccountState",
+    "HolderStatus",
     "DeferredTransferStatus",
     "StarmoneyClient",
     "WebhookValidator",
