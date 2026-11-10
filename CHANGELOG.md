@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+## [0.3.20] — 2026-11-11
+
+- B-52: `payment.received` payloads type `sender_phone` and `sender_iban` (both `Optional[str]`, null when the payer is outside StarMoney).
+- `payments.get_status` answers 404 (`NotFoundError`) for a payment another service or another user made, as for an unknown id.
+
 ## [0.3.19] — 2026-11-10
 
 - B-95: `accounts.link_rail(user_id, account_reference=IBAN)` links BDK from the bank's registry of linkable accounts (the IBAN is required on a first link). New `accounts.unlink_rail(user_id, rail_name="BDK")`. New typed errors: `LinkableAccountNotFoundError` (404) and `LinkVerificationFailedError` (409); `BankUnavailableError` (503) as in B-92.

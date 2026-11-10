@@ -153,6 +153,13 @@ class _PaymentReceivedPayloadRequired(TypedDict):
     # ``.get()`` against a bank older than B-79.
     sender_payee_id: Optional[str]
     sender_payee_name: Optional[str]
+    # Bank B-52 (0.3.20): who paid, IN FULL, so the recipient can save them
+    # («Enregistrer»): the in-network sender's phone (E.164, e.g. "+221771234567")
+    # and the account they paid from (their vIBAN or linked BDK IBAN). Always
+    # present on the wire, both None for an outside payer (another bank names
+    # no payer). Read with ``.get()`` against a bank older than 0.3.20.
+    sender_phone: Optional[str]
+    sender_iban: Optional[str]
     metadata: WebhookMetadata
 
 
