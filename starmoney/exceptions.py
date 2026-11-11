@@ -286,6 +286,23 @@ class LinkVerificationFailedError(APIError):
     pass
 
 
+class FundingRailChangedError(APIError):
+    """409 - between the preview and the confirm the rail that funds the send changed
+    (``error_code == "FUNDING_RAIL_CHANGED"``, 0.3.22). The quote priced a send funded
+    from the sender's vIBAN (``viban``) or from their linked BDK account (``bdk``) and
+    the confirm would now fund it from the other, so the quoted fee is not the fee
+    this send would bear. Nothing was written and the quote is not spent: preview
+    again, show the new fee, confirm the new quote. A quote is never repriced silently."""
+
+    @property
+    def quoted_funding_rail(self) -> Optional[str]:
+        return self.response_data.get("quoted_funding_rail")
+
+    @property
+    def current_funding_rail(self) -> Optional[str]:
+        return self.response_data.get("current_funding_rail")
+
+
 class InvalidSignatureError(StarmoneyError):
     """Webhook signature validation failed."""
 

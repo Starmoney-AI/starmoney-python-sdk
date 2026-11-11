@@ -110,7 +110,10 @@ class PaymentsResource:
             payment_mandate (revision-1 PaymentMandate signed by StarMoney).
             A quote-confirmed send also carries ``quote_id``, ``settlement_rail``,
             ``fees_minor {orchestrator, bank}``, ``fee_total_minor``,
-            ``total_debit_minor`` and ``fee_grid_version`` (null on a legacy send).
+            ``total_debit_minor``, ``fee_grid_version`` and, since 0.3.22,
+            ``segment`` and ``funding_rail`` (null on a legacy send).
+            ``total_debit_minor`` is what leaves the PAYING account: amount + the
+            1 % from a vIBAN, amount + what BDK takes itself from a linked BDK account.
             A same-cart retry answering ``already_failed`` carries ``funds``
             (:data:`starmoney.FundsOutcome`, since 0.3.2): ``not_debited`` or
             ``debited_under_review`` or, once the bank has returned the principal
@@ -125,7 +128,10 @@ class PaymentsResource:
                 QUOTE_CONSUMED (carries the consuming ``transaction_id`` +
                 ``customer_reference``), 410 QUOTE_EXPIRED (re-quote), 422
                 QUOTE_MISMATCH (``errors[]`` names the field), 409 RAIL_CHANGED
-                (re-quote), 402 INSUFFICIENT_FUNDS (``required_minor``),
+                (re-quote), 409 FUNDING_RAIL_CHANGED (0.3.22: the rail that funds
+                the send is no longer the one the quote priced; re-quote, never
+                repriced silently; ``FundingRailChangedError`` carries
+                ``quoted_funding_rail`` / ``current_funding_rail``), 402 INSUFFICIENT_FUNDS (``required_minor``),
                 404 NO_VIBAN_ACCOUNT.
             PreKycCeilingExceededError (403): over the per-send pre-KYC ceiling.
             PreKycTotalCeilingExceededError (403): over the cumulative pre-KYC
@@ -227,7 +233,8 @@ class PaymentsResource:
             + ``display_name_verified``, ``beneficiary {type, value}``,
             ``amount_minor``, ``currency``, ``fees_minor {orchestrator, bank}``,
             ``fee_total_minor``, ``total_debit_minor``, ``fee_collection``,
-            ``fee_grid_version``, ``send_remaining_minor``. The resolved IBAN is
+            ``fee_grid_version``, ``segment`` + ``funding_rail`` (0.3.22: the fee
+            depends on who funds the send), ``send_remaining_minor``. The resolved IBAN is
             never returned.
 
         Raises (B-32 envelopes, see docs/ERRORS.md):

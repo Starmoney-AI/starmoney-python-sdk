@@ -75,6 +75,7 @@ from .exceptions import (
     BankUnavailableError,
     LinkableAccountNotFoundError,
     LinkVerificationFailedError,
+    FundingRailChangedError,
     StarmoneyError,
     ValidationError,
     # UP3 typed exceptions
@@ -105,6 +106,8 @@ from .transfer_history import TransferDirection, TransferHistoryPage, TransferHi
 from .webhooks.events import WebhookEvent
 from .webhooks.payloads import (
     FeeLine,
+    FeeSegment,
+    FundingRail,
     FeeRefundLine,
     FeeRefundMarker,
     FundsOutcome,
@@ -168,6 +171,8 @@ __all__ = [
     "AccountKycVerifiedPayload",
     "AccountKycReviewRequiredPayload",
     "FeeLine",
+    "FeeSegment",
+    "FundingRail",
     "RecipientCheck",
     "CartAbandonment",
     "StoredMandates",
@@ -200,6 +205,7 @@ __all__ = [
     "BankUnavailableError",
     "LinkableAccountNotFoundError",
     "LinkVerificationFailedError",
+    "FundingRailChangedError",
     "InvalidSignatureError",
     # UP3 exceptions
     "UP3Error",

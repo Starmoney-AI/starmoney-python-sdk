@@ -24,20 +24,42 @@ from __future__ import annotations
 
 from typing import Literal, Optional, TypedDict
 
+# Fee grid v2 (0.3.22, owner rulings 11 Nov 2026). ``segment`` is the pricing segment
+# of the send (today every send is ``p2p``: 1 %, no minimum; ``b2c`` / ``b2b`` /
+# ``marketplace`` are placeholders priced like ``p2p`` until the owner rules).
+# ``funding_rail`` is who pays: the sender's StarMoney vIBAN (``viban``) or their
+# linked BDK account (``bdk``).
+FeeSegment = Literal["p2p", "b2c", "b2b", "marketplace"]
+FundingRail = Literal["viban", "bdk"]
+
 
 class FeeLine(TypedDict):
     """The fee line on every ``payment.*`` webhook of a quote-confirmed send
     (transfer routes, 0.3.0) and on the ``POST /v1/payments`` /
     ``GET /v1/payments/status/...`` responses. Absent on a legacy send (no
-    quote). ``amount`` on the event stays the principal; ``total_debit_minor``
-    is what left the sender (principal + both fee legs)."""
+    quote). ``amount`` on the event stays the principal.
+
+    Since 0.3.22 (fee grid v2) the legs depend on who funds the send:
+
+    * ``funding_rail == "viban"``: ``fees_minor == {"orchestrator": 1 %, "bank": 0}``;
+      StarMoney absorbs the RTGS cost (it is never on the wire).
+      ``total_debit_minor`` = amount + the orchestrator fee.
+    * ``funding_rail == "bdk"``: over RTGS ``fees_minor == {"orchestrator": 1 %,
+      "bank": 2500}`` (BDK takes the 2 500 F from the linked account itself, so the
+      total fee is 2 500 + the %); ``total_debit_minor`` = amount + the bank leg,
+      the 1 % is accrued and billed later.
+
+    ``total_debit_minor`` is what leaves the PAYING account with this send;
+    ``fee_total_minor`` is always the sum of both legs."""
 
     quote_id: str
-    settlement_rail: str  # "bdk.internal" (free) | "bdk.rtgs" (bank leg 2 500 F)
-    fees_minor: dict[str, int]  # {"orchestrator": 0, "bank": 2500}
+    settlement_rail: str  # "bdk.internal" | "bdk.rtgs"
+    fees_minor: dict[str, int]  # {"orchestrator": 500, "bank": 0}
     fee_total_minor: int
     total_debit_minor: int
     fee_grid_version: int
+    segment: FeeSegment
+    funding_rail: FundingRail
 
 
 # ``funds`` on ``payment.failed`` (B-49, 0.3.0) — closed vocabulary, never
@@ -306,6 +328,9 @@ class PaymentInitiatedPayload(_PaymentInitiatedPayloadRequired, total=False):
     fee_total_minor: int
     total_debit_minor: int
     fee_grid_version: int
+    # 0.3.22 (fee grid v2): which pricing segment and which rail paid for the send.
+    segment: FeeSegment
+    funding_rail: FundingRail
 
 
 class _PaymentRailFailedPayloadRequired(TypedDict):
@@ -359,6 +384,9 @@ class PaymentRailFailedPayload(_PaymentRailFailedPayloadRequired, total=False):
     fee_total_minor: int
     total_debit_minor: int
     fee_grid_version: int
+    # 0.3.22 (fee grid v2): which pricing segment and which rail paid for the send.
+    segment: FeeSegment
+    funding_rail: FundingRail
 
 
 class _PaymentBankStatusPayloadRequired(TypedDict):
@@ -410,6 +438,9 @@ class PaymentBankStatusPayload(_PaymentBankStatusPayloadRequired, total=False):
     fee_total_minor: int
     total_debit_minor: int
     fee_grid_version: int
+    # 0.3.22 (fee grid v2): which pricing segment and which rail paid for the send.
+    segment: FeeSegment
+    funding_rail: FundingRail
 
 
 class _PaymentFeeRefundedPayloadRequired(TypedDict):

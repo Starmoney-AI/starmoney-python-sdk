@@ -34,6 +34,7 @@ from .exceptions import (
     BankUnavailableError,
     LinkableAccountNotFoundError,
     LinkVerificationFailedError,
+    FundingRailChangedError,
     UP3_ERROR_CODE_MAP,
     UP3Error,
 )
@@ -174,6 +175,8 @@ class HTTPClient:
             raise LinkableAccountNotFoundError(response.status_code, message, error_data)
         if error_code == "LINK_VERIFICATION_FAILED":
             raise LinkVerificationFailedError(response.status_code, message, error_data)
+        if error_code == "FUNDING_RAIL_CHANGED":
+            raise FundingRailChangedError(response.status_code, message, error_data)
 
         # Check for UP3 error codes embedded in the detail string or error_code field.
         # The API returns UP3_* codes in either `detail` or an `error_code` field.
