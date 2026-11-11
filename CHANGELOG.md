@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+## [0.3.22] — 2026-11-11
+
+- Fee grid v2 (phase A): quotes, payment responses, transfer-history rows and every `payment.*` fee line carry `segment` (`p2p` | `b2c` | `b2b` | `marketplace`) and `funding_rail` (`viban` | `bdk`); new `starmoney.FeeSegment` and `starmoney.FundingRail`. `FeeLine` and the payment payload TypedDicts gain both keys.
+- New typed error `FundingRailChangedError` (409 `FUNDING_RAIL_CHANGED`, properties `quoted_funding_rail` / `current_funding_rail`): the sender's funding moved between preview and confirm, request a new quote.
+- Fee amounts follow the v2 grid: P2P is 1 % (`orchestrator`), the RTGS 2 500 F is on the `bank` leg only when a linked BDK account funds the send. `total_debit_minor` is what leaves the paying account.
+
 ## [0.3.21] — 2026-11-11
 
 - `accounts.get_status` returns `account_type` (`individual` | `business`); new `starmoney.AccountType`. Every account is individual today.
