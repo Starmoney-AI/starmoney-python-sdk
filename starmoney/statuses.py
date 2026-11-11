@@ -105,6 +105,15 @@ class VerificationStatus(str, Enum):
     VERIFIED = "verified"  # identity checked; no limits
 
 
+class AccountType(str, Enum):
+    """``account_type`` on ``accounts.get_status`` (0.3.21): who holds the account.
+    Every account is individual today; business onboarding comes after prod. A
+    merchant is a business that accepts customer payments, not a third type."""
+
+    INDIVIDUAL = "individual"
+    BUSINESS = "business"
+
+
 class DeferredTransferStatus(str, Enum):
     """``status`` of a deferred transfer (send / claim / list / status reads).
 

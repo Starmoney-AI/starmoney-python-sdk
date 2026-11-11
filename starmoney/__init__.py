@@ -51,8 +51,8 @@ Webhook Validation:
 """
 
 from .client import StarmoneyClient
-from .statuses import (AccountState, AccountStatus, DeferredTransferStatus, HolderStatus,
-                       VerificationStatus,
+from .statuses import (AccountState, AccountStatus, AccountType, DeferredTransferStatus,
+                       HolderStatus, VerificationStatus,
                        PaymentResponseStatus)
 from .exceptions import (
     APIError,
@@ -146,6 +146,7 @@ __all__ = [
     "HolderStatus",
     "AccountStatus",
     "VerificationStatus",
+    "AccountType",
     "DeferredTransferStatus",
     "StarmoneyClient",
     "WebhookValidator",

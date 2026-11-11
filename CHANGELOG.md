@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+## [0.3.21] — 2026-11-11
+
+- `accounts.get_status` returns `account_type` (`individual` | `business`); new `starmoney.AccountType`. Every account is individual today.
+
 ## [0.3.20] — 2026-11-11
 
 - B-52: `payment.received` payloads type `sender_phone` and `sender_iban` (both `Optional[str]`, null when the payer is outside StarMoney).

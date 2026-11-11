@@ -397,6 +397,8 @@ class AccountsResource:
               - verification_status: 'not_started' | 'pending' | 'verified' | None
                 (B-94; ``starmoney.VerificationStatus``)
               - can_send: bool — unchecked/checking under ``limits``, verified without.
+              - account_type: 'individual' | 'business' (0.3.21;
+                ``starmoney.AccountType``) — every account is individual today.
 
             ``account_state`` is a closed set; parse it with
             ``starmoney.AccountState``.

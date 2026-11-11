@@ -17,3 +17,10 @@ def test_is_stored_outcome():
         for s in PaymentResponseStatus
         if s is not PaymentResponseStatus.VALIDATED
     )
+
+
+def test_account_type_is_the_closed_wire_set():
+    from starmoney import AccountType
+
+    assert [t.value for t in AccountType] == ["individual", "business"]
+    assert AccountType("individual") is AccountType.INDIVIDUAL
