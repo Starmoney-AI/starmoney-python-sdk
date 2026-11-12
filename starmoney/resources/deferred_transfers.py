@@ -49,7 +49,14 @@ class DeferredTransferListItem(_DeferredTransferAccountFields):
 
 class DeferredTransferRead(_DeferredTransferAccountFields):
     """Account fields added to ``deferred_transfers.get(...)`` (B-56, and the
-    recipient's first name, B-54); the other keys of the response are unchanged."""
+    recipient's first name, B-54); the other keys of the response are unchanged.
+
+    Since 0.3.23 (B-98) the fee line also names the pricing ``segment`` and the
+    ``funding_rail`` (``"viban"`` | ``"bdk"``); both are null on a transfer sent
+    without a quote. Always sent; read with ``.get()`` against an older bank."""
+
+    segment: Optional[str]
+    funding_rail: Optional[str]
 
 
 class DeferredTransfersResource:
@@ -142,7 +149,12 @@ class DeferredTransfersResource:
               updated_at, description (the sender's wording, null when none),
               and the fee line of a quoted hold (``quote_id``,
               ``settlement_rail``, ``fees_minor``, ``fee_total_minor``,
-              ``total_debit_minor``, ``fee_grid_version`` — null on a legacy send).
+              ``total_debit_minor``, ``fee_grid_version``, ``segment``,
+              ``funding_rail`` — null on a legacy send). Since 0.3.23 the
+              deferred transfer carries the 1 %: a vIBAN-funded hold reserves
+              amount + fee (``total_debit_minor``), released whole on cancel or
+              expiry and booked when the transfer is executed; a send from a
+              linked BDK account accrues it (``total_debit_minor`` = amount).
 
         Raises:
             ValidationError (422): Invalid request (e.g. missing
@@ -238,8 +250,8 @@ class DeferredTransfersResource:
         and a ``deferred_quote``; the customer confirmed «hold 20 000 F for
         +221 78 … until they open an account». This builds the intent and a
         **0.2 cart that signs the deferred quote** (the phone as typed, the
-        amount, the fee legs — none — and an execution window, R1–R4) and
-        posts the chain to ``POST /v1/deferred-transfers/send`` with nothing
+        amount, the fee legs as the quote priced them, and an execution window,
+        R1–R4) and posts the chain to ``POST /v1/deferred-transfers/send`` with nothing
         else about the instruction. The bank verifies the consent BEFORE
         placing the hold, spends the quote with the row, and answers the
         deferred transfer with its fee line and ``sm_reference``. No

@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+## [0.3.23] — 2026-11-12
+
+- B-98: the deferred transfer carries the 1 % (owner, 12 Nov: «the fee is deducted at transfer time, if pending goes back to cancelled the fee is refunded. For deferred/scheduled transfer the fee is taken when the transfer is executed»). The `deferred_quote` of a `RECIPIENT_HAS_NO_ACCOUNT` refusal now prices it, so `deferred_transfers.send_with_mandates(...)` signs real fee legs. Example: Awa (vIBAN) sends 25 000 F to a number with no account → `fees_minor {orchestrator: 250, bank: 0}`, `total_debit_minor` 25 250 (the hold reserves amount + fee, released whole on cancel or expiry, booked when the transfer is executed); from a linked BDK account `total_debit_minor` stays 25 000.
+- `DeferredTransferRead` gains `segment` and `funding_rail` (`Optional[str]`, null on a transfer sent without a quote; the fee line of `deferred_transfers.send` / `.get` / `.cancel` carries them). Additive.
+- `deferred_transfers.send(...)` / `send_with_mandates(...)` can now raise `FundingRailChangedError` (409 `FUNDING_RAIL_CHANGED`): the rail that funds the send is not the one the quote was priced for. Request a new quote.
+
 ## [0.3.22] — 2026-11-11
 
 - Fee grid v2 (phase A): quotes, payment responses, transfer-history rows and every `payment.*` fee line carry `segment` (`p2p` | `b2c` | `b2b` | `marketplace`) and `funding_rail` (`viban` | `bdk`); new `starmoney.FeeSegment` and `starmoney.FundingRail`. `FeeLine` and the payment payload TypedDicts gain both keys.

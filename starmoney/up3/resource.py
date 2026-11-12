@@ -471,9 +471,11 @@ class UP3Resource:
 
         When ``payments.quote(...)`` answers **422 ``RECIPIENT_HAS_NO_ACCOUNT``**
         for a phone nobody holds yet, the refusal carries ``deferred_quote``:
-        the quote of the hold the sender may place instead (``bdk.internal``,
-        no fee — the money moves inside BDK when the recipient opens their
-        account). This cart signs that quote, the phone **as the customer
+        the quote of the hold the sender may place instead (``bdk.internal``; the
+        money moves inside BDK when the recipient opens their account). Since
+        0.3.23 it carries the fee legs as the quote priced them (1 %): the hold
+        reserves amount + fee, booked when the transfer is executed. This cart
+        signs that quote, the phone **as the customer
         typed it**, the amount, and an **execution window**
         (``execute_before``, UP3 0.2-draft R1–R4): the latest moment the bank
         may still execute the consented transfer — the hold runs until then
