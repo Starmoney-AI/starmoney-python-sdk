@@ -4,7 +4,7 @@
 
 ## [0.3.24] — 2026-11-12
 
-- Version bump in lockstep with the service (B-96, the fee transfer to StarMoney's gain vIBAN). No SDK surface change: no request, response, event or error changed, and the fee transfer emits no consumer webhook.
+- Version bump in lockstep with the service (B-96, the fee transfer to StarMoney's gain vIBAN). No SDK surface change: no request, response, event or error shape changed, and the fee transfer emits no consumer webhook. Values only: `fee_collection` reads `charged` (was `accrued`) on a vIBAN-funded send and `fee_grid_version` is 4.
 
 ## [0.3.23] — 2026-11-12
 
