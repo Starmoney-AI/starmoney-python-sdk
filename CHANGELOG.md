@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+## [0.3.44] — 2026-11-13
+
+- **P19, proof required by default** (owner ruling, 13 Nov 2026): the bank now refuses every send without an Intent + Cart chain (409 `UP3_MANDATE_REQUIRED`, `UP3MandateRequired`) and every cart whose `user_consent_evidence.type` is not a customer-present proof it accepts (422 `UP3_TYPE_NOT_ACCEPTED`, `UP3TypeNotAccepted`; `errors[0].expected = "chat_session_pin_v1"`). The accepted type is `chat_session_pin_v1` for every issuer; `service_attestation` is refused. No per-issuer switch any more.
+- **Breaking (keyword-only):** `up3.build_cart(...)`, `up3.build_cart_v02(...)`, `up3.build_deferred_cart_v02(...)` require `consent_evidence=`; `payments.send_with_mandates(...)` and `deferred_transfers.send_with_mandates(...)` require `consent_token=`. Omitting it is a `TypeError`; passing `None` or `{"type": "service_attestation", ...}` is a `ValueError` raised before anything is signed or posted. A caller already passing a fresh `chat_session_pin_v1` block on every send (whatsapp-chatbot #2096) needs no change.
+- New constant `starmoney.up3.resource.CHAT_SESSION_PIN_V1`. `payments.send(...)` / `deferred_transfers.send(...)` without envelopes remain for the bank's own service only (documented on the methods).
+- Docstrings: `UP3MandateRequired`, `UP3TypeNotAccepted`, `UP3TypeRequiredMissing` (retired code, kept for mapping).
+
 ## [0.3.43] — 2026-11-13
 
 - B-104, one code = one send: `payments.send_with_mandates(...)` and `deferred_transfers.send_with_mandates(...)` can raise **`UP3EvidenceReused`** (409 `UP3_EVIDENCE_REUSED`, kind `state`) when the cart's `chat_session_pin_v1` act (`session_id_hash` + `verified_at`) already confirmed another cart the bank stored for this service. Nothing was held, sent or written. Ask the user their code again and mint a new cart (new seed) stamped with the fresh check; a same-seed retry of the first cart still answers 200 with the stored outcome. Always on at the bank — no flag to flip. `service_attestation` is unaffected. Suggested copy: «Par sécurité, saisissez à nouveau votre code pour confirmer cet envoi.»

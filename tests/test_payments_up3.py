@@ -7,6 +7,8 @@ from unittest.mock import AsyncMock, MagicMock
 
 from starmoney.resources.payments import PaymentsResource
 from starmoney.up3.resource import UP3Resource
+
+from ._evidence import pin_evidence
 from starmoney.exceptions import (
     UP3SignatureInvalid,
     UP3SchemaInvalid,
@@ -107,6 +109,7 @@ async def test_send_with_mandates_raises_without_up3_resource():
             description="Test",
             rail_name="BDK",
             user_ref="whatsapp:+221770000000",
+            consent_token=pin_evidence(),
         )
 
 
@@ -133,6 +136,7 @@ async def test_send_with_mandates_builds_and_submits_mandates():
         rail="BDK",
         fees_minor={},
         confirmed_at=confirmed_at,
+        consent_evidence=pin_evidence(confirmed_at),
     )
 
     # Build a fake (but signed) PaymentMandate in the response
@@ -183,6 +187,7 @@ async def test_send_with_mandates_builds_and_submits_mandates():
         description="Test",
         rail_name="BDK",
         user_ref="whatsapp:+221770000000",
+        consent_token=pin_evidence(),
     )
 
     assert result["transaction_id"] == "txn-1"
@@ -244,6 +249,7 @@ async def test_send_with_mandates_same_seed_retry_reuses_cart_id():
         rail_name="BDK",
         user_ref="whatsapp:+221770000000",
         idempotency_seed="consent-jti-abc123",
+        consent_token=pin_evidence(),  # same proof on both attempts: a retry, not a new consent
     )
 
     await resource.send_with_mandates(**kwargs)
@@ -268,6 +274,7 @@ async def test_send_with_mandates_different_seeds_get_different_cart_ids():
         description="Test",
         rail_name="BDK",
         user_ref="whatsapp:+221770000000",
+        consent_token=pin_evidence(),
     )
 
     await resource.send_with_mandates(**base_kwargs, idempotency_seed="consent-jti-abc123")
@@ -305,6 +312,7 @@ async def test_send_with_mandates_client_transaction_id_defaults_to_derived_cart
         rail_name="BDK",
         user_ref="whatsapp:+221770000000",
         idempotency_seed="consent-jti-abc123",
+        consent_token=pin_evidence(),
     )
 
     assert posted_txn_ids[0] == posted_cart_ids[0]
@@ -330,6 +338,7 @@ async def test_send_with_mandates_rejects_mismatched_client_transaction_id_local
             user_ref="whatsapp:+221770000000",
             idempotency_seed="consent-jti-abc123",
             client_transaction_id="SM-some-other-id",
+            consent_token=pin_evidence(),
         )
 
     http.post.assert_not_called()
@@ -340,7 +349,7 @@ async def test_send_with_mandates_rejects_mismatched_client_transaction_id_local
 # ---------------------------------------------------------------------------
 
 
-def test_up3_error_code_map_covers_all_13_codes():
+def test_up3_error_code_map_covers_every_code():
     from starmoney.exceptions import UP3_ERROR_CODE_MAP
 
     expected_codes = {
@@ -363,6 +372,7 @@ def test_up3_error_code_map_covers_all_13_codes():
         "UP3_REVISION_REGRESSION",
         "UP3_EXECUTION_MODE_MISMATCH",
         "UP3_CART_ABANDONED",
+        "UP3_EVIDENCE_REUSED",
     }
     assert set(UP3_ERROR_CODE_MAP.keys()) == expected_codes
 
@@ -446,6 +456,7 @@ async def test_send_with_mandates_signs_the_callers_confirmed_at_into_the_cart()
         description="Test",
         user_ref="whatsapp:+221770000000",
         confirmed_at="2026-10-03T14:23:14Z",
+        consent_token=pin_evidence('2026-10-03T14:23:14Z'),
     )
 
     sent = http.post.call_args.kwargs["json"]
@@ -478,6 +489,7 @@ async def test_send_with_mandates_does_not_check_the_banks_signature_with_the_cl
             beneficiary_name="Fatou",
             description="Test",
             user_ref="whatsapp:+221770000000",
+            consent_token=pin_evidence(),
         )
     verify.assert_not_called()
     assert result["payment_mandate"] is unverifiable
@@ -505,6 +517,7 @@ async def test_cart_id_for_equals_the_cart_id_of_a_seeded_send():
         description="Test",
         user_ref="whatsapp:+221770000000",
         idempotency_seed="consent-jti-abc",
+        consent_token=pin_evidence(),
     )
     sent = http.post.call_args.kwargs["json"]
     assert sent["client_transaction_id"] == resource.cart_id_for("consent-jti-abc")

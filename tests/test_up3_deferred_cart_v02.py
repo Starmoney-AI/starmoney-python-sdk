@@ -23,6 +23,8 @@ from starmoney.resources.deferred_transfers import DeferredTransfersResource
 from starmoney.up3.resource import UP3Resource
 from starmoney.up3.vendor.signing import verify
 
+from ._evidence import pin_evidence
+
 SECRET = b"test-secret-key-at-least-32-chars"
 ISSUER = "test-sdk"
 DIGEST = "cd" * 32
@@ -96,6 +98,7 @@ def test_deferred_cart_signs_the_refusals_quote_and_validates_against_the_bank_s
         amount_minor=20_000,
         confirmed_at=confirmed_at,
         execute_before=_z(_parse_z(confirmed_at) + _dt.timedelta(days=3)),
+        consent_evidence=pin_evidence(confirmed_at),
     )
 
     assert cart["version"] == "0.2" and cart["type"] == "cart" and cart["issuer"] == ISSUER
@@ -125,10 +128,12 @@ def test_deferred_cart_accepts_the_whole_refusal_or_its_deferred_quote():
     resource = _resource()
     intent = _intent(resource)
     whole = resource.build_deferred_cart_v02(
-        intent, refusal=_refusal(), beneficiary_value=PHONE, amount_minor=20_000
+        intent, refusal=_refusal(), beneficiary_value=PHONE, amount_minor=20_000,
+        consent_evidence=pin_evidence(),
     )
     inner = resource.build_deferred_cart_v02(
-        intent, refusal=_refusal()["deferred_quote"], beneficiary_value=PHONE, amount_minor=20_000
+        intent, refusal=_refusal()["deferred_quote"], beneficiary_value=PHONE, amount_minor=20_000,
+        consent_evidence=pin_evidence(),
     )
     assert whole["payload"]["quote"] == inner["payload"]["quote"] == {
         "id": QUOTE_ID, "digest": DIGEST, "digest_alg": "sha256-jcs-v1"
@@ -141,20 +146,23 @@ def test_deferred_cart_default_window_is_hold_days_after_the_tap_and_capped_at_s
     confirmed_at = "2026-10-31T12:00:00Z"
 
     seven = resource.build_deferred_cart_v02(
-        intent, refusal=_refusal(), beneficiary_value=PHONE, amount_minor=20_000, confirmed_at=confirmed_at
+        intent, refusal=_refusal(), beneficiary_value=PHONE, amount_minor=20_000, confirmed_at=confirmed_at,
+        consent_evidence=pin_evidence(confirmed_at),
     )
     assert seven["payload"]["execute_before"] == "2026-11-07T12:00:00Z"
 
     two = resource.build_deferred_cart_v02(
         intent, refusal=_refusal(), beneficiary_value=PHONE, amount_minor=20_000,
         confirmed_at=confirmed_at, hold_days=2,
+        consent_evidence=pin_evidence(confirmed_at),
     )
     assert two["payload"]["execute_before"] == "2026-11-02T12:00:00Z"
 
     for bad in (0, 8):
         with pytest.raises(ValueError, match="hold_days"):
             resource.build_deferred_cart_v02(
-                intent, refusal=_refusal(), beneficiary_value=PHONE, amount_minor=20_000, hold_days=bad
+                intent, refusal=_refusal(), beneficiary_value=PHONE, amount_minor=20_000, hold_days=bad,
+                consent_evidence=pin_evidence(),
             )
 
 
@@ -163,6 +171,7 @@ def test_deferred_cart_normalises_an_explicit_window_to_the_envelope_z_form():
     cart = resource.build_deferred_cart_v02(
         _intent(resource), refusal=_refusal(), beneficiary_value=PHONE, amount_minor=20_000,
         execute_before="2026-11-03T12:00:00.123456+00:00",
+        consent_evidence=pin_evidence(),
     )
     assert cart["payload"]["execute_before"] == "2026-11-03T12:00:00Z"
     assert re.fullmatch(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z", cart["payload"]["execute_before"])
@@ -173,6 +182,7 @@ def test_deferred_cart_never_outlives_the_quote_p12():
     cart = resource.build_deferred_cart_v02(
         _intent(resource), refusal=_refusal(expires_in_seconds=45), beneficiary_value=PHONE,
         amount_minor=20_000, ttl_minutes=2,
+        consent_evidence=pin_evidence(),
     )
     quote_exp = _dt.datetime.fromisoformat(_refusal(expires_in_seconds=45)["deferred_quote"]["expires_at"])
     assert _parse_z(cart["expires_at"]) <= quote_exp + _dt.timedelta(seconds=1)
@@ -182,10 +192,12 @@ def test_deferred_cart_same_seed_same_id():
     resource = _resource()
     intent = _intent(resource)
     a = resource.build_deferred_cart_v02(
-        intent, refusal=_refusal(), beneficiary_value=PHONE, amount_minor=20_000, idempotency_seed="jti-1"
+        intent, refusal=_refusal(), beneficiary_value=PHONE, amount_minor=20_000, idempotency_seed="jti-1",
+        consent_evidence=pin_evidence(),
     )
     b = resource.build_deferred_cart_v02(
-        intent, refusal=_refusal(), beneficiary_value=PHONE, amount_minor=20_000, idempotency_seed="jti-1"
+        intent, refusal=_refusal(), beneficiary_value=PHONE, amount_minor=20_000, idempotency_seed="jti-1",
+        consent_evidence=pin_evidence(),
     )
     assert a["id"] == b["id"] == resource.cart_id_for("jti-1")
 
@@ -201,7 +213,12 @@ def test_deferred_cart_same_seed_same_id():
 )
 def test_deferred_cart_refuses_locally_what_the_bank_would_refuse(kwargs, match):
     resource = _resource()
-    args = {"refusal": _refusal(), "beneficiary_value": PHONE, "amount_minor": 20_000}
+    args = {
+        "refusal": _refusal(),
+        "beneficiary_value": PHONE,
+        "amount_minor": 20_000,
+        "consent_evidence": pin_evidence(),
+    }
     args.update(kwargs)
     with pytest.raises(ValueError, match=match):
         resource.build_deferred_cart_v02(_intent(resource), **args)
@@ -242,7 +259,8 @@ async def test_send_with_a_chain_defaults_the_id_and_the_quote_to_the_cart():
     resource, http = _dt_resource()
     intent = _intent(resource._up3)
     cart = resource._up3.build_deferred_cart_v02(
-        intent, refusal=_refusal(), beneficiary_value=PHONE, amount_minor=20_000
+        intent, refusal=_refusal(), beneficiary_value=PHONE, amount_minor=20_000,
+        consent_evidence=pin_evidence(),
     )
     await resource.send(intent_mandate=intent, cart_mandate=cart, user_id="user-1")
     body = http.post.call_args.kwargs["json"]
@@ -258,7 +276,8 @@ async def test_send_refuses_locally_a_body_that_contradicts_the_cart():
     resource, _ = _dt_resource()
     intent = _intent(resource._up3)
     cart = resource._up3.build_deferred_cart_v02(
-        intent, refusal=_refusal(), beneficiary_value=PHONE, amount_minor=20_000
+        intent, refusal=_refusal(), beneficiary_value=PHONE, amount_minor=20_000,
+        consent_evidence=pin_evidence(),
     )
     with pytest.raises(ValueError, match="cart.id"):
         await resource.send(client_transaction_id="other", intent_mandate=intent, cart_mandate=cart)
@@ -280,6 +299,7 @@ async def test_send_without_a_quote_still_demands_the_full_instruction():
 @pytest.mark.asyncio
 async def test_send_with_mandates_builds_the_chain_and_posts_nothing_else():
     resource, http = _dt_resource()
+    consent_token = pin_evidence()
     out = await resource.send_with_mandates(
         "user-1",
         user_ref="whatsapp:+221770000001",
@@ -288,7 +308,7 @@ async def test_send_with_mandates_builds_the_chain_and_posts_nothing_else():
         amount_minor=20_000,
         hold_days=3,
         idempotency_seed="consent-jti-9",
-        consent_token={"type": "service_attestation", "data": {"jti": "consent-jti-9"}},
+        consent_token=consent_token,
         client_reference="wa-flow-42",
     )
     body = http.post.call_args.kwargs["json"]
@@ -297,7 +317,8 @@ async def test_send_with_mandates_builds_the_chain_and_posts_nothing_else():
     assert body["client_transaction_id"] == cart["id"] == resource._up3.cart_id_for("consent-jti-9")
     assert body["quote_id"] == QUOTE_ID
     assert cart["payload"]["beneficiary"] == {"type": "msisdn", "value": PHONE}
-    assert cart["payload"]["user_consent_evidence"]["data"] == {"jti": "consent-jti-9"}
+    assert cart["payload"]["user_consent_evidence"] == consent_token  # what is passed is what is signed
+    assert cart["payload"]["user_consent_evidence"]["data"] == consent_token["data"]
     window = _parse_z(cart["payload"]["execute_before"]) - _parse_z(cart["payload"]["confirmed_at"])
     assert window == _dt.timedelta(days=3)
     assert body["intent_mandate"]["payload"]["max_amount_minor"] == 20_000
@@ -315,6 +336,7 @@ async def test_send_with_mandates_posts_the_wording_only_when_given():
         "user-1", user_ref="whatsapp:+221770000001", refusal=_refusal(),
         beneficiary_value=PHONE, amount_minor=20_000, idempotency_seed="jti-w",
         description="loyer",
+        consent_token=pin_evidence(),
     )
     body = http.post.call_args.kwargs["json"]
     assert body["description"] == "loyer"
@@ -325,6 +347,7 @@ async def test_send_with_mandates_posts_the_wording_only_when_given():
     await resource.send_with_mandates(
         "user-1", user_ref="whatsapp:+221770000001", refusal=_refusal(),
         beneficiary_value=PHONE, amount_minor=20_000, idempotency_seed="jti-w2",
+        consent_token=pin_evidence(),
     )
     assert "description" not in http.post.call_args.kwargs["json"]
 
@@ -336,12 +359,14 @@ async def test_send_with_mandates_needs_the_up3_resource_and_a_deferred_quote():
         await resource.send_with_mandates(
             "user-1", user_ref="whatsapp:+221770000001", refusal=_refusal(with_quote=False),
             beneficiary_value=PHONE, amount_minor=20_000,
+            consent_token=pin_evidence(),
         )
     resource._up3 = None
     with pytest.raises(RuntimeError, match="UP3 resource not wired"):
         await resource.send_with_mandates(
             "user-1", user_ref="whatsapp:+221770000001", refusal=_refusal(),
             beneficiary_value=PHONE, amount_minor=20_000,
+            consent_token=pin_evidence(),
         )
 
 
@@ -353,7 +378,8 @@ async def test_send_with_mandates_needs_the_up3_resource_and_a_deferred_quote():
 def test_execution_mode_is_absent_unless_asked_so_nothing_changes_for_existing_callers():
     resource = _resource()
     cart = resource.build_deferred_cart_v02(
-        _intent(resource), refusal=_refusal(), beneficiary_value=PHONE, amount_minor=20_000
+        _intent(resource), refusal=_refusal(), beneficiary_value=PHONE, amount_minor=20_000,
+        consent_evidence=pin_evidence(),
     )
     assert "execution_mode" not in cart["payload"]
 
@@ -366,6 +392,7 @@ def test_a_best_effort_cart_signs_the_mode_and_validates_against_the_bank_schema
         beneficiary_value=PHONE,
         amount_minor=20_000,
         execution_mode="deferred_best_effort",
+        consent_evidence=pin_evidence(),
     )
     assert cart["payload"]["execution_mode"] == "deferred_best_effort"
     assert verify(cart, secret=SECRET) is True
@@ -385,9 +412,10 @@ def test_an_unknown_execution_mode_is_refused_before_signing():
         resource.build_deferred_cart_v02(
             _intent(resource), refusal=_refusal(), beneficiary_value=PHONE, amount_minor=20_000,
             execution_mode="best_effort",
+            consent_evidence=pin_evidence(),
         )
     with pytest.raises(ValueError, match="execution_mode"):
-        resource.build_cart_v02(_intent(resource), quote={}, execution_mode="soon")
+        resource.build_cart_v02(_intent(resource), quote={}, execution_mode="soon", consent_evidence=pin_evidence())
 
 
 def test_the_immediate_cart_builder_carries_the_mode_too():
@@ -400,6 +428,6 @@ def test_the_immediate_cart_builder_carries_the_mode_too():
         "fees_minor": {"orchestrator": 0, "bank": 0},
         "display_name": "Moussa B.",
     }
-    cart = resource.build_cart_v02(_intent(resource), quote=quote, execution_mode="immediate")
+    cart = resource.build_cart_v02(_intent(resource), quote=quote, execution_mode="immediate", consent_evidence=pin_evidence())
     assert cart["payload"]["execution_mode"] == "immediate"
-    assert "execution_mode" not in resource.build_cart_v02(_intent(resource), quote=quote)["payload"]
+    assert "execution_mode" not in resource.build_cart_v02(_intent(resource), quote=quote, consent_evidence=pin_evidence())["payload"]

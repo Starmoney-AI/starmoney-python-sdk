@@ -416,7 +416,14 @@ class UP3SchemaInvalid(UP3Error):
 
 
 class UP3TypeNotAccepted(UP3Error):
-    """UP3_TYPE_NOT_ACCEPTED — consent_evidence.type not in allowlist (HTTP 422)."""
+    """UP3_TYPE_NOT_ACCEPTED — the cart's ``user_consent_evidence.type`` is not a
+    customer-present proof the bank accepts (HTTP 422). Since 0.3.44 (P19) the
+    accepted set is one constant for every issuer — ``chat_session_pin_v1`` today;
+    ``service_attestation`` (the service's own word) is refused. ``errors[0]`` is
+    ``{field: "payload.user_consent_evidence.type", rule: "enum.invalid",
+    expected: "chat_session_pin_v1"}``. A refusal, nothing written: ask the user
+    their code and mint a new cart with the fresh check.
+    """
 
     code = "UP3_TYPE_NOT_ACCEPTED"
 
@@ -452,11 +459,13 @@ class UP3RevisionRegression(UP3Error):
 
 
 class UP3MandateRequired(UP3Error):
-    """UP3_MANDATE_REQUIRED — the verifier's policy flags your issuer as
-    mandate-required and this payment carried no Intent + Cart chain (HTTP 409).
+    """UP3_MANDATE_REQUIRED — this send carried no Intent + Cart chain (HTTP 409).
 
-    A refusal: nothing was sent, nothing was written. It is NOT a duplicate.
-    (0.2-draft staging profile P9.)
+    Since 0.3.44 (P19) every send on ``POST /v1/payments`` and
+    ``POST /v1/deferred-transfers/send`` needs the chain, with a customer-present
+    proof in the cart, for every service but the bank's own; there is no
+    per-issuer switch. A refusal: nothing was sent, nothing held, nothing
+    written. It is NOT a duplicate. Use ``send_with_mandates(...)``.
     """
 
     code = "UP3_MANDATE_REQUIRED"
@@ -477,9 +486,10 @@ class UP3IssuerMismatch(UP3Error):
 
 
 class UP3TypeRequiredMissing(UP3Error):
-    """UP3_TYPE_REQUIRED_MISSING — the verifier requires a consent-evidence type
-    for your issuer and the cart carries a different, merely accepted, one
-    (HTTP 422). (Profile P10.)"""
+    """UP3_TYPE_REQUIRED_MISSING — RETIRED in 0.3.44 (P19): the per-issuer
+    required-type policy is gone; a cart whose type the bank does not accept is
+    ``UP3_TYPE_NOT_ACCEPTED``. The code is kept reserved and is no longer
+    raised by the bank; the class stays so older envelopes still map."""
 
     code = "UP3_TYPE_REQUIRED_MISSING"
 
