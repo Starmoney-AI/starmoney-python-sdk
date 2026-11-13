@@ -65,6 +65,7 @@ from .exceptions import (  # UP3 typed exceptions
     LinkableAccountNotFoundError,
     LinkedAccountReferenceMissingError,
     LinkedAccountRejectedError,
+    InstitutionAlreadyLinkedError,
     LinkVerificationFailedError,
     NoVibanAccountError,
     PaymentNotFoundError,
@@ -213,6 +214,7 @@ __all__ = [
     "BankUnavailableError",
     "LinkableAccountNotFoundError",
     "LinkVerificationFailedError",
+    "InstitutionAlreadyLinkedError",
     "FundingRailChangedError",
     "InvalidSignatureError",
     # UP3 exceptions

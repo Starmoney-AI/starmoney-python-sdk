@@ -147,6 +147,11 @@ class AccountsResource:
                 «another phone»).
             LinkVerificationFailedError: 409 — the registered account did not
                 verify at BDK.
+            InstitutionAlreadyLinkedError: 409 (B-101) — an account is already
+                linked at this institution and ``account_reference`` is a
+                different IBAN; ``linked_account_reference_masked`` names the
+                linked one, which is unchanged. Unlink first to change it. The
+                same IBAN again is 200 ``already_linked``.
             BankUnavailableError: 503 — BDK could not be reached; retry.
 
         Example:
@@ -350,6 +355,12 @@ class AccountsResource:
               else ``None`` — grey that row out. Both references are ``None`` until the
               holder gives the IBAN (``link_rail(account_reference=…)`` or
               ``set_rail_account_reference``, service 0.3.13); never a balance.
+              B-101: each item also carries ``institution_code`` and ``linked_at``
+              (when the link was made; ``None`` if not linked).
+            - institutions: B-101 — the banks a holder may link:
+              ``[{"code": "bdk", "display_name": "BDK", "country": "SN",
+              "status": "available" | "coming_soon", "link_method":
+              "phone_iban_registry"}]``. Link one with ``link_rail(user_id, code)``.
             - total_rails: Total number of rails
             - configured_rails: Number of rails with stored credentials
 

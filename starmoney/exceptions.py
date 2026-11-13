@@ -302,6 +302,23 @@ class LinkVerificationFailedError(APIError):
     pass
 
 
+class InstitutionAlreadyLinkedError(APIError):
+    """409 - the holder already linked an account at this institution and asked to
+    link a different IBAN there (``error_code == "INSTITUTION_ALREADY_LINKED"``,
+    B-101). One account per institution; the stored IBAN is unchanged. Tell the
+    holder which account is linked (``linked_account_reference_masked``, last 4
+    only); to change it, ``unlink_rail`` then ``link_rail``. Linking the SAME IBAN
+    again is not an error (200 ``already_linked``)."""
+
+    @property
+    def institution_code(self) -> Optional[str]:
+        return self.response_data.get("institution_code")
+
+    @property
+    def linked_account_reference_masked(self) -> Optional[str]:
+        return self.response_data.get("linked_account_reference_masked")
+
+
 class FundingRailChangedError(APIError):
     """409 - between the preview and the confirm the rail that funds the send changed
     (``error_code == "FUNDING_RAIL_CHANGED"``, 0.3.22). The quote priced a send funded
