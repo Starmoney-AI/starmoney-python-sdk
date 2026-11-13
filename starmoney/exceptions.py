@@ -73,7 +73,9 @@ class APIError(StarmoneyError):
         error_id: The server's correlation id for this error, when present.
     """
 
-    def __init__(self, status_code: int, message: str, response_data: Optional[dict[str, Any]] = None):
+    def __init__(
+        self, status_code: int, message: str, response_data: Optional[dict[str, Any]] = None
+    ):
         self.status_code = status_code
         self.response_data = response_data or {}
         envelope = _parse_envelope(self.response_data, status_code)
@@ -148,6 +150,20 @@ class InvalidIBANError(APIError):
 class PreKycCeilingExceededError(APIError):
     """403 - the send exceeds the PER-SEND ceiling of a holder the bank has not
     verified yet (``error_code == "PRE_KYC_CEILING_EXCEEDED"``)."""
+
+    pass
+
+
+class RecipientLimitReachedError(APIError):
+    """403 - the RECIPIENT has reached the limit of what an unverified account may
+    hold (``error_code == "RECIPIENT_LIMIT_REACHED"``, B-102).
+
+    The send would push the payee's balance past the pre-KYC balance cap, so the
+    bank refused it before anything was held or parked. The payload carries NO
+    figure (the payee's balance and headroom are theirs); the fixed message is the
+    whole answer. Lifted when the payee is verified. Raised by ``payments.quote``,
+    ``payments.send`` and ``deferred_transfers.send``.
+    """
 
     pass
 

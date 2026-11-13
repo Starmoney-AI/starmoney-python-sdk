@@ -136,6 +136,9 @@ class PaymentsResource:
             PreKycCeilingExceededError (403): over the per-send pre-KYC ceiling.
             PreKycTotalCeilingExceededError (403): over the cumulative pre-KYC
                 send ceiling; carries ceiling / consumed / pending / remaining.
+            RecipientLimitReachedError (403 RECIPIENT_LIMIT_REACHED, B-102): the
+                RECIPIENT's unverified account cannot hold this amount; no
+                figure is given, the payee is told to verify. Nothing written.
             ValidationError (400/401/410/422): UP3 chain or schema error.
             UP3Replay (409): a cart id reused with different content or by a
                 different owner. A same-cart.id retry with the same content is
@@ -245,7 +248,12 @@ class PaymentsResource:
                 ``deferred_quote`` for ``POST /v1/deferred-transfers``;
             404 BENEFICIARY_NOT_FOUND; 409 RECIPIENT_NOT_CREDITABLE /
                 BENEFICIARY_ACCOUNT_CLOSED; 429 IDENTIFIER_LOOKUP_LIMIT_REACHED
-                (``retry_after_seconds``); 403 PRE_KYC_*_CEILING_EXCEEDED.
+                (``retry_after_seconds``); 403 PRE_KYC_*_CEILING_EXCEEDED;
+            403 RECIPIENT_LIMIT_REACHED (``RecipientLimitReachedError``, B-102):
+                the recipient's unverified account cannot hold the amount — no
+                figure; also on a ``deferred`` outcome when the number belongs
+                to a holder still opening or unverified. 503 LEDGER_UNAVAILABLE
+                when the payee's ledger could not be read (refused, not guessed).
         """
         payload: dict[str, Any] = {
             "beneficiary": {"type": beneficiary_type, "value": beneficiary_value},
@@ -275,7 +283,9 @@ class PaymentsResource:
               otherwise the same answer as the payment's ``payment.failed``.
               Null otherwise.
         """
-        response = await self.http.get(f"/payments/status/{client_transaction_id}", user_id=user_id)
+        response = await self.http.get(
+            f"/payments/status/{client_transaction_id}", user_id=user_id
+        )
         return response.json()
 
     async def get_mandates(self, user_id: str, cart_id: str) -> StoredMandates:
@@ -437,7 +447,8 @@ class PaymentsResource:
         """
         if self._up3 is None:
             raise RuntimeError(
-                "send_with_mandates requires the UP3 resource; " "initialise StarmoneyClient with up3_secret=..."
+                "send_with_mandates requires the UP3 resource; "
+                "initialise StarmoneyClient with up3_secret=..."
             )
 
         if quote is not None:
@@ -476,7 +487,11 @@ class PaymentsResource:
                 + " (or pass quote=<the payments.quote(...) response> and let the 0.2 cart sign it)"
             )
         assert amount_minor is not None and currency is not None  # for type-checkers
-        assert beneficiary_iban is not None and beneficiary_name is not None and description is not None
+        assert (
+            beneficiary_iban is not None
+            and beneficiary_name is not None
+            and description is not None
+        )
 
         # Step 1 — build and sign IntentMandate.
         intent = self._up3.build_intent(
@@ -629,5 +644,7 @@ class PaymentsResource:
             RuntimeError: UP3 resource not configured.
         """
         if self._up3 is None:
-            raise RuntimeError("cart_id_for requires the UP3 resource; initialise StarmoneyClient with up3_secret=...")
+            raise RuntimeError(
+                "cart_id_for requires the UP3 resource; initialise StarmoneyClient with up3_secret=..."
+            )
         return self._up3.cart_id_for(idempotency_seed)

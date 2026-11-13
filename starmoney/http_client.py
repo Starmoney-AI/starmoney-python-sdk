@@ -8,35 +8,37 @@ error handling, and correlation ID generation.
 import re
 import uuid
 from typing import Any, Optional
+
 import httpx
 
 from .auth import AuthManager
 from .exceptions import (
+    UP3_ERROR_CODE_MAP,
+    AccountNotPayableError,
+    APIError,
     AuthenticationError,
-    ValidationError,
-    PaymentNotFoundError,
-    DuplicateResourceError,
-    InvalidIBANError,
-    SelfTransferNotAllowedError,
-    InvalidPhoneError,
-    PhoneCountryNotSupportedError,
+    BankUnavailableError,
     BeneficiaryAddLimitReachedError,
+    DuplicateResourceError,
+    FundingRailChangedError,
+    InvalidIBANError,
+    InvalidPhoneError,
+    LedgerUnavailableError,
+    LinkableAccountNotFoundError,
+    LinkedAccountReferenceMissingError,
+    LinkedAccountRejectedError,
+    LinkVerificationFailedError,
+    NoVibanAccountError,
+    PaymentNotFoundError,
+    PhoneCountryNotSupportedError,
     PreKycCeilingExceededError,
     PreKycTotalCeilingExceededError,
     RateLimitError,
+    RecipientLimitReachedError,
+    SelfTransferNotAllowedError,
     ServerError,
-    APIError,
-    NoVibanAccountError,
-    AccountNotPayableError,
-    LedgerUnavailableError,
-    LinkedAccountReferenceMissingError,
-    LinkedAccountRejectedError,
-    BankUnavailableError,
-    LinkableAccountNotFoundError,
-    LinkVerificationFailedError,
-    FundingRailChangedError,
-    UP3_ERROR_CODE_MAP,
     UP3Error,
+    ValidationError,
 )
 
 
@@ -75,7 +77,9 @@ class HTTPClient:
 
     async def __aenter__(self) -> "HTTPClient":
         """Async context manager entry."""
-        self._client = httpx.AsyncClient(timeout=self.timeout, follow_redirects=self.follow_redirects)
+        self._client = httpx.AsyncClient(
+            timeout=self.timeout, follow_redirects=self.follow_redirects
+        )
         return self
 
     async def __aexit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
@@ -86,10 +90,14 @@ class HTTPClient:
     def _get_client(self) -> httpx.AsyncClient:
         """Get or create HTTP client."""
         if self._client is None:
-            self._client = httpx.AsyncClient(timeout=self.timeout, follow_redirects=self.follow_redirects)
+            self._client = httpx.AsyncClient(
+                timeout=self.timeout, follow_redirects=self.follow_redirects
+            )
         return self._client
 
-    def _add_headers(self, headers: Optional[dict[str, str]], user_id: Optional[str] = None) -> dict[str, str]:
+    def _add_headers(
+        self, headers: Optional[dict[str, str]], user_id: Optional[str] = None
+    ) -> dict[str, str]:
         """
         Add authentication and correlation ID headers.
 
@@ -157,6 +165,8 @@ class HTTPClient:
             raise DuplicateResourceError(response.status_code, message, error_data)
         if error_code == "PRE_KYC_TOTAL_CEILING_EXCEEDED":
             raise PreKycTotalCeilingExceededError(response.status_code, message, error_data)
+        if error_code == "RECIPIENT_LIMIT_REACHED":
+            raise RecipientLimitReachedError(response.status_code, message, error_data)
         if error_code == "PRE_KYC_CEILING_EXCEEDED":
             raise PreKycCeilingExceededError(response.status_code, message, error_data)
         if error_code == "NO_VIBAN_ACCOUNT":
@@ -193,7 +203,9 @@ class HTTPClient:
         # A UP3_* code this SDK does not know yet (a newer verifier) is still a
         # protocol refusal, never a "duplicate" or a bare APIError: surface it
         # as UP3Error with the code set, so callers can branch on `.code`.
-        unknown_up3 = re.search(r"\b(UP3_[A-Z_]+)\b", message) if isinstance(message, str) else None
+        unknown_up3 = (
+            re.search(r"\b(UP3_[A-Z_]+)\b", message) if isinstance(message, str) else None
+        )
         if unknown_up3:
             exc = UP3Error(message, error_data)
             exc.code = unknown_up3.group(1)
@@ -258,7 +270,9 @@ class HTTPClient:
         """Make GET request."""
         return await self.request("GET", path, user_id=user_id, **kwargs)
 
-    async def post(self, path: str, user_id: Optional[str] = None, **kwargs: Any) -> httpx.Response:
+    async def post(
+        self, path: str, user_id: Optional[str] = None, **kwargs: Any
+    ) -> httpx.Response:
         """Make POST request."""
         return await self.request("POST", path, user_id=user_id, **kwargs)
 
@@ -266,7 +280,9 @@ class HTTPClient:
         """Make PUT request."""
         return await self.request("PUT", path, user_id=user_id, **kwargs)
 
-    async def delete(self, path: str, user_id: Optional[str] = None, **kwargs: Any) -> httpx.Response:
+    async def delete(
+        self, path: str, user_id: Optional[str] = None, **kwargs: Any
+    ) -> httpx.Response:
         """Make DELETE request."""
         return await self.request("DELETE", path, user_id=user_id, **kwargs)
 

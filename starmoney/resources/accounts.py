@@ -186,7 +186,9 @@ class AccountsResource:
         response = await self.http.delete(f"/accounts/rails/{rail_name}", user_id=user_id)
         return response.json()
 
-    async def set_rail_account_reference(self, user_id: str, rail_name: str, account_reference: str) -> dict[str, Any]:
+    async def set_rail_account_reference(
+        self, user_id: str, rail_name: str, account_reference: str
+    ) -> dict[str, Any]:
         """
         Record (or correct) the IBAN of the account linked on a rail (B-58).
 
@@ -447,23 +449,34 @@ class AccountsResource:
         The send limits currently binding the holder — ``[]`` once verified.
 
         While the bank has not verified the holder (``active_pre_kyc`` or
-        ``kyc_pending``) two limits apply, both lifted on ``kyc_verified`` and
-        with NO reset date (lifetime until verification):
+        ``kyc_pending``) the pre-KYC limit grid applies (B-102, 0.3.41: the
+        Wave KYC-1 shape, maintained by the bank's ops), all lifted on
+        ``kyc_verified`` with NO reset date (lifetime until verification).
 
-        Each item also carries ``direction`` (``"outbound"``; ``"inbound"``
-        once inbound limits exist) and ``period`` (``"per_transaction"`` or
-        ``"lifetime_until_verified"``).
+        Each item carries ``kind``, ``direction`` (``"outbound"`` |
+        ``"inbound"`` | ``"balance"``), ``period`` (``"per_transaction"`` |
+        ``"lifetime_until_verified"`` | ``"at_any_time"`` | ``"calendar_month"``)
+        and ``enforced`` (False = shown to the holder, refused nowhere).
 
-          - ``pre_kyc_per_send``    — ceiling per send; ``consumed_minor`` /
+          - ``pre_kyc_per_send``      — ceiling per send; ``consumed_minor`` /
             ``pending_minor`` / ``remaining_minor`` are None.
-          - ``pre_kyc_total_sends`` — ceiling on all sends together.
+          - ``pre_kyc_total_sends``   — ceiling on all sends together.
             ``consumed_minor`` = executed, ``pending_minor`` = in flight (counts
             against the ceiling), ``remaining_minor`` = what may still be sent.
+          - ``pre_kyc_balance``       — what the account may HOLD at any time
+            (the payee cap: a send that would push the holder past it is refused
+            to the SENDER with RECIPIENT_LIMIT_REACHED). ``consumed_minor`` = the
+            holder's own posted balance, read live from the ledger at this
+            moment (None when the ledger could not be read); ``remaining_minor``
+            = what they may still receive. This item is the ONE place the SDK
+            hands a balance-derived figure, and only to the holder themself.
+          - ``pre_kyc_total_inbound`` — money received this UTC calendar month;
+            ``consumed_minor`` = this month's credits. Declared, ``enforced``
+            False today.
 
-        ``remaining_minor`` counts the holder's own sends (« envois possibles »).
-        It is NOT the money in the account — never present it as a balance.
-        Money received is not limited and not counted. Indicative: the server's
-        send guard is the authority (a concurrent send can change the figures).
+        ``remaining_minor`` on the send limits counts the holder's own sends
+        (« envois possibles ») — never present it as a balance. Indicative: the
+        server's guards are the authority (a concurrent send can change the figures).
 
         Convenience over get_status(): returns its ``limits`` list.
         """

@@ -159,7 +159,11 @@ class DeferredTransfersResource:
         Raises:
             ValidationError (422): Invalid request (e.g. missing
                 linked_external_account_id for Branch B, amount <= 0).
-            APIError (503): vIBAN ledger service unavailable.
+            RecipientLimitReachedError (403 RECIPIENT_LIMIT_REACHED, B-102): the
+                recipient's unverified account cannot hold this amount; refused
+                before the hold, no figure given. Lifted when they verify.
+            APIError (503): vIBAN ledger service unavailable (also when the
+                recipient's ledger account could not be read for the cap).
         """
         if (intent_mandate is None) != (cart_mandate is None):
             raise ValueError("intent_mandate and cart_mandate travel together")
@@ -176,7 +180,9 @@ class DeferredTransfersResource:
             if quote_id is None:
                 quote_id = signed
             elif signed is not None and quote_id != signed:
-                raise ValueError(f"quote_id={quote_id!r} is not the quote the cart signs ({signed!r})")
+                raise ValueError(
+                    f"quote_id={quote_id!r} is not the quote the cart signs ({signed!r})"
+                )
         if client_transaction_id is None:
             raise ValueError("client_transaction_id is required (or a cart whose id it is)")
         if quote_id is None:
@@ -196,7 +202,10 @@ class DeferredTransfersResource:
             if funding_source is None:
                 funding_source = "viban_hold"
 
-        payload: dict[str, Any] = {"client_transaction_id": client_transaction_id, "currency": currency}
+        payload: dict[str, Any] = {
+            "client_transaction_id": client_transaction_id,
+            "currency": currency,
+        }
         if recipient_handle is not None:
             payload["recipient_handle"] = recipient_handle
         if amount_minor is not None:
@@ -297,7 +306,8 @@ class DeferredTransfersResource:
             )
         intent = self._up3.build_intent(
             user_ref=user_ref,
-            description=description or f"hold {int(amount_minor)} {currency} for {beneficiary_value}",
+            description=description
+            or f"hold {int(amount_minor)} {currency} for {beneficiary_value}",
             max_amount_minor=int(amount_minor),
             currency=currency,
             beneficiary_hint=beneficiary_value,

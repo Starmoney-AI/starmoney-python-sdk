@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+## [0.3.41] — 2026-11-13
+
+- B-102, the payee cap: `payments.quote(...)`, `payments.send(...)` / `send_with_mandates(...)` and `deferred_transfers.send(...)` / `send_with_mandates(...)` can raise **`RecipientLimitReachedError`** (403 `RECIPIENT_LIMIT_REACHED`): the recipient's unverified or new account cannot hold the amount. Nothing was written; the error carries no figure (the payee's balance is theirs) — show «{name} a atteint la limite de son compte» and suggest they verify. A sender refused 3 times toward one payee in 24 h is refused every amount to that payee for the window. `LedgerUnavailableError` (503) can also come from those calls when the recipient's ledger account could not be read.
+- `accounts.get_limits(user_id)` / `get_status(...).limits[]`: every item carries `enforced` (bool); an unverified holder also gets `pre_kyc_balance` (`direction: "balance"`, `period: "at_any_time"`, `consumed_minor` = their own posted balance read live, `remaining_minor` = what they may still receive) and `pre_kyc_total_inbound` (`"inbound"` · `"calendar_month"`, `enforced: false` today). Additive.
+- Versions 0.3.25 → 0.3.40 were lockstep bumps with no SDK surface change.
+
 ## [0.3.24] — 2026-11-12
 
 - Version bump in lockstep with the service (B-96, the fee transfer to StarMoney's gain vIBAN). No SDK surface change: no request, response, event or error shape changed, and the fee transfer emits no consumer webhook. Values only: `fee_collection` reads `charged` (was `accrued`) on a vIBAN-funded send and `fee_grid_version` is 4.
