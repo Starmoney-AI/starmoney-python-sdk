@@ -27,6 +27,7 @@ from .exceptions import (
     LinkableAccountNotFoundError,
     LinkedAccountReferenceMissingError,
     LinkedAccountRejectedError,
+    InstitutionAlreadyLinkedError,
     LinkVerificationFailedError,
     NoVibanAccountError,
     PaymentNotFoundError,
@@ -185,6 +186,8 @@ class HTTPClient:
             raise LinkableAccountNotFoundError(response.status_code, message, error_data)
         if error_code == "LINK_VERIFICATION_FAILED":
             raise LinkVerificationFailedError(response.status_code, message, error_data)
+        if error_code == "INSTITUTION_ALREADY_LINKED":
+            raise InstitutionAlreadyLinkedError(response.status_code, message, error_data)
         if error_code == "FUNDING_RAIL_CHANGED":
             raise FundingRailChangedError(response.status_code, message, error_data)
 

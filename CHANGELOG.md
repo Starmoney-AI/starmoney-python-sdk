@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- B-101: new typed error `InstitutionAlreadyLinkedError` (409 `INSTITUTION_ALREADY_LINKED`, properties `institution_code` and `linked_account_reference_masked`) raised by `accounts.link_rail(...)` when the holder already linked an account at that institution and gives a different IBAN (the stored IBAN is unchanged; unlink first). `accounts.get_user_available_rails(...)` now also returns `institutions` (`code`, `display_name`, `country`, `status`, `link_method`) and each row carries `institution_code` and `linked_at`; the SDK returns the dict unchanged. Additive.
+
 ## [0.3.43] — 2026-11-13
 
 - B-104, one code = one send: `payments.send_with_mandates(...)` and `deferred_transfers.send_with_mandates(...)` can raise **`UP3EvidenceReused`** (409 `UP3_EVIDENCE_REUSED`, kind `state`) when the cart's `chat_session_pin_v1` act (`session_id_hash` + `verified_at`) already confirmed another cart the bank stored for this service. Nothing was held, sent or written. Ask the user their code again and mint a new cart (new seed) stamped with the fresh check; a same-seed retry of the first cart still answers 200 with the stored outcome. Always on at the bank — no flag to flip. `service_attestation` is unaffected. Suggested copy: «Par sécurité, saisissez à nouveau votre code pour confirmer cet envoi.»
