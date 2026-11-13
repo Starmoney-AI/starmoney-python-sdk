@@ -503,8 +503,21 @@ class UP3CartAbandoned(UP3Error):
     code = "UP3_CART_ABANDONED"
 
 
+class UP3EvidenceReused(UP3Error):
+    """UP3_EVIDENCE_REUSED — one code confirms exactly one send (HTTP 409).
+
+    The cart's ``chat_session_pin_v1`` act (``session_id_hash`` + ``verified_at``)
+    already confirmed ANOTHER cart the bank stored for this service. Nothing was
+    held, sent or written. Ask the user for their code again and mint a new cart
+    (new seed) with the fresh check. A retry of the SAME cart (same seed) is not
+    this error: it answers 200 with the stored outcome. (B-104, 0.3.43.)"""
+
+    code = "UP3_EVIDENCE_REUSED"
+
+
 # Map error code strings -> exception classes for http_client error handling.
 UP3_ERROR_CODE_MAP: dict[str, type[UP3Error]] = {
+    "UP3_EVIDENCE_REUSED": UP3EvidenceReused,
     "UP3_MANDATE_REQUIRED": UP3MandateRequired,
     "UP3_EXECUTION_MODE_MISMATCH": UP3ExecutionModeMismatch,
     "UP3_CART_ABANDONED": UP3CartAbandoned,
