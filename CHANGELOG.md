@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- Service-side only (React backoffice read views, PR #343). No SDK surface change.
+
 ## [0.3.43] — 2026-11-13
 
 - B-104, one code = one send: `payments.send_with_mandates(...)` and `deferred_transfers.send_with_mandates(...)` can raise **`UP3EvidenceReused`** (409 `UP3_EVIDENCE_REUSED`, kind `state`) when the cart's `chat_session_pin_v1` act (`session_id_hash` + `verified_at`) already confirmed another cart the bank stored for this service. Nothing was held, sent or written. Ask the user their code again and mint a new cart (new seed) stamped with the fresh check; a same-seed retry of the first cart still answers 200 with the stored outcome. Always on at the bank — no flag to flip. `service_attestation` is unaffected. Suggested copy: «Par sécurité, saisissez à nouveau votre code pour confirmer cet envoi.»
