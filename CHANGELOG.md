@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+- Service-side only (React backoffice read views, PR #343). No SDK surface change.
+
+- Version bump in lockstep with the service (B-107 request telemetry: the bank now logs one redacted line per request and per handler run; nothing changes on the wire). No SDK surface change.
+
 - B-101: new typed error `InstitutionAlreadyLinkedError` (409 `INSTITUTION_ALREADY_LINKED`, properties `institution_code` and `linked_account_reference_masked`) raised by `accounts.link_rail(...)` when the holder already linked an account at that institution and gives a different IBAN (the stored IBAN is unchanged; unlink first). `accounts.get_user_available_rails(...)` now also returns `institutions` (`code`, `display_name`, `country`, `status`, `link_method`) and each row carries `institution_code` and `linked_at`; the SDK returns the dict unchanged. Additive.
 
 ## [0.3.43] — 2026-11-13
