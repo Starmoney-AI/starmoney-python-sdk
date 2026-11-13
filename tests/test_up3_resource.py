@@ -14,6 +14,8 @@ from starmoney.up3.resource import UP3Resource, _mandate_id
 from starmoney.up3.vendor.signing import sign, verify, canonicalize
 from starmoney.up3.vendor.errors import UP3SignatureInvalid
 
+from ._evidence import pin_evidence
+
 
 SECRET = b"test-secret-for-sdk-unit-tests"
 ISSUER = "test-sdk"
@@ -180,6 +182,7 @@ def test_build_cart_structure_and_chain():
         rail="BDK",
         fees_minor={"orchestrator": 50},
         confirmed_at=confirmed_at,
+        consent_evidence=pin_evidence(confirmed_at),
     )
 
     assert cart["type"] == "cart"
@@ -193,9 +196,9 @@ def test_build_cart_structure_and_chain():
     assert payload["rail"] == "BDK"
     assert payload["fees_minor"] == {"orchestrator": 50}
     assert payload["confirmed_at"] == confirmed_at
-    # v0.1 default
-    assert payload["user_consent_evidence"]["type"] == "service_attestation"
-    assert payload["user_consent_evidence"]["data"] == {}
+    # P19: the cart carries exactly the customer-present block it was given
+    assert payload["user_consent_evidence"]["type"] == "chat_session_pin_v1"
+    assert payload["user_consent_evidence"]["data"]["attempt_count"] == 1
 
 
 def test_build_cart_signature_verifies():
@@ -212,12 +215,14 @@ def test_build_cart_signature_verifies():
         beneficiary_iban="SN12K00100152000025690007542",
         beneficiary_name="Rec",
         rail="BDK",
+        consent_evidence=pin_evidence(),
     )
     assert verify(cart, secret=SECRET) is True
 
 
-def test_build_cart_default_service_attestation():
+def test_build_cart_carries_exactly_the_evidence_it_was_given():
     resource = UP3Resource(secret=SECRET, issuer=ISSUER)
+    evidence = pin_evidence()
     intent = resource.build_intent(
         user_ref="ref",
         description="test",
@@ -230,10 +235,9 @@ def test_build_cart_default_service_attestation():
         beneficiary_iban="SN12K00100152000025690007542",
         beneficiary_name="Rec",
         rail="BDK",
+        consent_evidence=evidence,
     )
-    ev = cart["payload"]["user_consent_evidence"]
-    assert ev["type"] == "service_attestation"
-    assert ev["data"] == {}
+    assert cart["payload"]["user_consent_evidence"] == evidence
 
 
 # ---------------------------------------------------------------------------
@@ -254,6 +258,7 @@ def _build_cart_with_seed(resource: UP3Resource, seed) -> dict:
         beneficiary_iban="SN12K00100152000025690007542",
         beneficiary_name="Fatou Ndiaye",
         idempotency_seed=seed,
+        consent_evidence=pin_evidence(),
     )
 
 

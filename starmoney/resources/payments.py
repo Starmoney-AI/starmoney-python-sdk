@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING, Any, Literal, Optional, TypedDict
 from .._iban import is_valid_iban
 from ..exceptions import InvalidIBANError
 from ..http_client import HTTPClient
+from ..up3.resource import _require_consent_evidence
 
 if TYPE_CHECKING:
     from ..up3.resource import UP3Resource
@@ -71,7 +72,15 @@ class PaymentsResource:
         quote_id: Optional[str] = None,
     ) -> dict[str, Any]:
         """
-        Send a payment, optionally with a UP3 mandate chain.
+        Send a payment with a UP3 mandate chain (low-level; prefer
+        :meth:`send_with_mandates`, which builds the chain for you).
+
+        P19 (0.3.44): the bank refuses a send WITHOUT ``intent_mandate`` +
+        ``cart_mandate`` with 409 ``UP3_MANDATE_REQUIRED`` for every service
+        but its own; the cart must carry a customer-present proof
+        (``chat_session_pin_v1`` today), else 422 ``UP3_TYPE_NOT_ACCEPTED``.
+        Nothing is written on either refusal. The un-mandated shapes below
+        remain only for the bank's own service.
 
         Two ways to name the instruction (transfer routes, 0.3.0):
           - **confirm a quote**: ``quote_id`` from :meth:`quote`; amount,
@@ -98,10 +107,12 @@ class PaymentsResource:
                        can fund from their vIBAN, else BDK.
             client_transaction_id: Idempotency key.
             metadata: Optional extra metadata dict.
-            intent_mandate: Optional UP3 IntentMandate envelope (signed dict).
-                            When omitted the legacy non-mandated flow runs.
-            cart_mandate: Optional UP3 CartMandate envelope (signed dict).
-                          Required if intent_mandate is provided.
+            intent_mandate: UP3 IntentMandate envelope (signed dict). Omitting
+                            it is 409 UP3_MANDATE_REQUIRED since 0.3.44 for
+                            every service but the bank's own.
+            cart_mandate: UP3 CartMandate envelope (signed dict), with a
+                          customer-present ``user_consent_evidence``.
+                          Required with intent_mandate.
 
         Returns:
             CreatePaymentAPIResponse dict including transaction_id,
@@ -336,9 +347,9 @@ class PaymentsResource:
         description: Optional[str] = None,
         rail_name: Optional[str] = None,
         user_ref: str,
+        consent_token: dict[str, Any],
         client_transaction_id: Optional[str] = None,
         client_reference: Optional[str] = None,
-        consent_token: Optional[dict[str, Any]] = None,
         fees_minor: Optional[dict[str, int]] = None,
         intent_ttl_minutes: int = 15,
         cart_ttl_minutes: int = 2,
@@ -349,6 +360,11 @@ class PaymentsResource:
     ) -> dict[str, Any]:
         """
         Build Intent + Cart mandates and submit the payment — all in one call.
+
+        P19 (0.3.44): ``consent_token`` is REQUIRED — the customer-present proof
+        the cart carries, ``chat_session_pin_v1`` today (the code the user just
+        typed; one fresh block per send, B-104). ``service_attestation`` is
+        refused locally (ValueError) as the bank would (422 UP3_TYPE_NOT_ACCEPTED).
 
         Two ways to name the instruction (transfer routes, 0.3.0):
 
@@ -381,9 +397,9 @@ class PaymentsResource:
         once the bank signs them with an asymmetric key (UP3 0.2-draft).
 
         The UP3 resource must be initialised with a secret (up3_secret arg on
-        StarmoneyClient) for signing to work. If up3_secret is not set,
-        mandate envelopes are not built and the call falls back to the legacy
-        non-mandated flow.
+        StarmoneyClient) for signing to work; without it this method raises
+        RuntimeError (there is no un-mandated fallback: the bank would refuse
+        it with 409 UP3_MANDATE_REQUIRED).
 
         Args:
             user_id: Authenticated sender user ID.
@@ -402,14 +418,16 @@ class PaymentsResource:
             user_ref: Stable user identifier (e.g. 'whatsapp:+221771234567').
             client_transaction_id: Idempotency key. Defaults to the cart mandate
                                    id (recommended per UP3 spec).
-            consent_token: The user_consent_evidence the cart carries. Defaults
-                to service_attestation (the client's word). A chat surface should
-                pass chat_session_pin_v1 {verified_at, attempt_count,
-                session_id_hash}: the bank accepts it per issuer
-                (UP3_ACCEPTED_EVIDENCE_TYPES) and measures consent freshness
-                from verified_at against confirmed_at (300 s window).
-                attempt_count is a lower bound (wrong codes typed inside a PIN
-                Flow never reach the session).
+            consent_token: The user_consent_evidence the cart carries, REQUIRED
+                (P19): chat_session_pin_v1 {verified_at, attempt_count,
+                session_id_hash} — the only type the bank accepts today, for
+                every issuer. The bank measures consent freshness from
+                verified_at against confirmed_at (300 s window) and spends the
+                act (session_id_hash + verified_at) with the stored cart: a
+                second cart on the same act is 409 UP3_EVIDENCE_REUSED, so ask
+                the user their code again for every send. attempt_count is a
+                lower bound (wrong codes typed inside a PIN Flow never reach
+                the session). service_attestation raises ValueError here.
             fees_minor: Fees dict for the CartMandate (e.g. {"orchestrator": 50}).
                         Defaults to empty dict.
             intent_ttl_minutes: IntentMandate TTL (default 15, max 60).
@@ -443,6 +461,7 @@ class PaymentsResource:
 
         Raises:
             RuntimeError: UP3 resource not configured with a secret.
+            ValueError: consent_token missing or service_attestation (P19).
             ValidationError / APIError: Any UP3 or payment error from the API.
         """
         if self._up3 is None:
@@ -450,6 +469,7 @@ class PaymentsResource:
                 "send_with_mandates requires the UP3 resource; "
                 "initialise StarmoneyClient with up3_secret=..."
             )
+        consent_token = _require_consent_evidence(consent_token)
 
         if quote is not None:
             return await self._send_with_quoted_cart(

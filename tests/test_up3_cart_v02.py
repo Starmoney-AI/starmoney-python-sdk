@@ -21,6 +21,8 @@ from starmoney.resources.payments import PaymentsResource
 from starmoney.up3.resource import UP3Resource
 from starmoney.up3.vendor.signing import verify
 
+from ._evidence import pin_evidence
+
 SECRET = b"test-secret-key-at-least-32-chars"
 ISSUER = "test-sdk"
 DIGEST = "ab" * 32
@@ -86,7 +88,11 @@ def test_cart_v02_copies_the_quote_and_validates_against_the_bank_schema():
     quote = _quote_response()
     confirmed_at = _z(_dt.datetime.now(_dt.timezone.utc))
 
-    cart = resource.build_cart_v02(intent, quote=quote, confirmed_at=confirmed_at)
+    consent_evidence = pin_evidence(confirmed_at)
+
+    cart = resource.build_cart_v02(
+        intent, quote=quote, confirmed_at=confirmed_at, consent_evidence=consent_evidence
+    )
 
     assert cart["version"] == "0.2" and cart["type"] == "cart" and cart["issuer"] == ISSUER
     p = cart["payload"]
@@ -99,7 +105,7 @@ def test_cart_v02_copies_the_quote_and_validates_against_the_bank_schema():
     assert p["fees_minor"] == {"orchestrator": 0, "bank": 2_500}
     assert p["beneficiary_name"] is None  # the quote had no display name
     assert p["confirmed_at"] == confirmed_at
-    assert p["user_consent_evidence"] == {"type": "service_attestation", "data": {}}
+    assert p["user_consent_evidence"] == consent_evidence  # P19: exactly the block passed
     # nothing by value, no rail (ADR-001 / P11)
     assert "beneficiary_iban" not in p and "rail" not in p
     assert verify(cart, secret=SECRET) is True
@@ -117,11 +123,11 @@ def test_cart_v02_takes_the_display_name_the_quote_showed_or_the_callers_shorten
     intent = _intent(resource)
     quote = _quote_response(display_name="Moussa Ndiaye", display_name_verified=True)
 
-    assert resource.build_cart_v02(intent, quote=quote)["payload"]["beneficiary_name"] == "Moussa Ndiaye"
-    short = resource.build_cart_v02(intent, quote=quote, beneficiary_name="Moussa N.")
+    assert resource.build_cart_v02(intent, quote=quote, consent_evidence=pin_evidence())["payload"]["beneficiary_name"] == "Moussa Ndiaye"
+    short = resource.build_cart_v02(intent, quote=quote, beneficiary_name="Moussa N.", consent_evidence=pin_evidence())
     assert short["payload"]["beneficiary_name"] == "Moussa N."
     # an explicit None is honoured (the screen showed no name)
-    assert resource.build_cart_v02(intent, quote=quote, beneficiary_name=None)["payload"]["beneficiary_name"] is None
+    assert resource.build_cart_v02(intent, quote=quote, beneficiary_name=None, consent_evidence=pin_evidence())["payload"]["beneficiary_name"] is None
 
 
 def test_cart_v02_never_outlives_the_quote_p12():
@@ -129,14 +135,14 @@ def test_cart_v02_never_outlives_the_quote_p12():
     intent = _intent(resource)
     # quote expires in 45 s, cart TTL asks for 2 min → clamped to the quote
     quote = _quote_response(expires_in_seconds=45)
-    cart = resource.build_cart_v02(intent, quote=quote, ttl_minutes=2)
+    cart = resource.build_cart_v02(intent, quote=quote, ttl_minutes=2, consent_evidence=pin_evidence())
     quote_exp = _dt.datetime.fromisoformat(quote["quote"]["expires_at"])
     cart_exp = _dt.datetime.strptime(cart["expires_at"], "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=_dt.timezone.utc)
     assert cart_exp <= quote_exp
     assert re.fullmatch(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z", cart["expires_at"])
 
     # a long-lived quote leaves the cart's own TTL in place
-    roomy = resource.build_cart_v02(intent, quote=_quote_response(expires_in_seconds=600), ttl_minutes=2)
+    roomy = resource.build_cart_v02(intent, quote=_quote_response(expires_in_seconds=600), ttl_minutes=2, consent_evidence=pin_evidence())
     roomy_exp = _dt.datetime.strptime(roomy["expires_at"], "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=_dt.timezone.utc)
     assert roomy_exp - _dt.datetime.now(_dt.timezone.utc) > _dt.timedelta(seconds=100)
 
@@ -144,9 +150,9 @@ def test_cart_v02_never_outlives_the_quote_p12():
 def test_cart_v02_same_seed_same_id_and_cart_id_for_agrees():
     resource = _resource()
     intent = _intent(resource)
-    a = resource.build_cart_v02(intent, quote=_quote_response(), idempotency_seed="consent-jti-1")
-    b = resource.build_cart_v02(intent, quote=_quote_response(), idempotency_seed="consent-jti-1")
-    c = resource.build_cart_v02(intent, quote=_quote_response(), idempotency_seed="consent-jti-2")
+    a = resource.build_cart_v02(intent, quote=_quote_response(), idempotency_seed="consent-jti-1", consent_evidence=pin_evidence())
+    b = resource.build_cart_v02(intent, quote=_quote_response(), idempotency_seed="consent-jti-1", consent_evidence=pin_evidence())
+    c = resource.build_cart_v02(intent, quote=_quote_response(), idempotency_seed="consent-jti-2", consent_evidence=pin_evidence())
     assert a["id"] == b["id"] == resource.cart_id_for("consent-jti-1")
     assert a["id"] != c["id"]
     assert re.fullmatch(r"mnd_[A-Z0-9]{26}", a["id"])
@@ -156,9 +162,9 @@ def test_cart_v02_refuses_a_partial_quote_or_a_deferred_one():
     resource = _resource()
     intent = _intent(resource)
     with pytest.raises(ValueError, match="whole POST /v1/payments/quotes response"):
-        resource.build_cart_v02(intent, quote={"quote_id": "x", "amount_minor": 5_000})
+        resource.build_cart_v02(intent, quote={"quote_id": "x", "amount_minor": 5_000}, consent_evidence=pin_evidence())
     with pytest.raises(ValueError, match="deferred"):
-        resource.build_cart_v02(intent, quote=_quote_response(outcome="deferred"))
+        resource.build_cart_v02(intent, quote=_quote_response(outcome="deferred"), consent_evidence=pin_evidence())
 
 
 # ---------------------------------------------------------------------------
@@ -197,7 +203,7 @@ async def test_quoted_send_posts_the_02_chain_and_nothing_else_about_the_instruc
         quote=quote,
         description="loyer novembre",
         idempotency_seed="consent-jti-9",
-        consent_token={"type": "service_attestation", "data": {}},
+        consent_token=pin_evidence(),
     )
 
     body = http.post.call_args.kwargs["json"]
@@ -224,7 +230,7 @@ async def test_quoted_send_posts_the_02_chain_and_nothing_else_about_the_instruc
 @pytest.mark.asyncio
 async def test_quoted_send_needs_no_description_and_no_instruction_fields():
     resource, http = _payments()
-    await resource.send_with_mandates(user_id="user-1", user_ref="whatsapp:+221770000001", quote=_quote_response())
+    await resource.send_with_mandates(user_id="user-1", user_ref="whatsapp:+221770000001", quote=_quote_response(), consent_token=pin_evidence())
     body = http.post.call_args.kwargs["json"]
     assert body["cart_mandate"]["version"] == "0.2"
     assert body.get("description") is None
@@ -237,15 +243,18 @@ async def test_quoted_send_refuses_contradicting_arguments():
     resource, _ = _payments()
     with pytest.raises(ValueError, match="quote_id=.*is not the quote passed"):
         await resource.send_with_mandates(
-            user_id="u", user_ref="whatsapp:+221770000001", quote=_quote_response(), quote_id="another"
+            user_id="u", user_ref="whatsapp:+221770000001", quote=_quote_response(), quote_id="another",
+            consent_token=pin_evidence(),
         )
     with pytest.raises(ValueError, match="rail_name cannot be combined"):
         await resource.send_with_mandates(
-            user_id="u", user_ref="whatsapp:+221770000001", quote=_quote_response(), rail_name="BDK"
+            user_id="u", user_ref="whatsapp:+221770000001", quote=_quote_response(), rail_name="BDK",
+            consent_token=pin_evidence(),
         )
     with pytest.raises(ValueError, match="does not match"):
         await resource.send_with_mandates(
-            user_id="u", user_ref="whatsapp:+221770000001", quote=_quote_response(), client_transaction_id="my-id"
+            user_id="u", user_ref="whatsapp:+221770000001", quote=_quote_response(), client_transaction_id="my-id",
+            consent_token=pin_evidence(),
         )
 
 
@@ -254,7 +263,8 @@ async def test_legacy_send_without_a_quote_still_needs_the_full_instruction():
     resource, http = _payments()
     with pytest.raises(ValueError, match="missing amount_minor, beneficiary_iban"):
         await resource.send_with_mandates(
-            user_id="u", user_ref="whatsapp:+221770000001", currency="XOF", beneficiary_name="F", description="d"
+            user_id="u", user_ref="whatsapp:+221770000001", currency="XOF", beneficiary_name="F", description="d",
+            consent_token=pin_evidence(),
         )
     # the 0.1 path is unchanged
     await resource.send_with_mandates(
@@ -265,6 +275,7 @@ async def test_legacy_send_without_a_quote_still_needs_the_full_instruction():
         beneficiary_iban="SN12K00100152000025690007542",
         beneficiary_name="Fatou",
         description="d",
+        consent_token=pin_evidence(),
     )
     body = http.post.call_args.kwargs["json"]
     assert body["cart_mandate"]["version"] == "0.1"

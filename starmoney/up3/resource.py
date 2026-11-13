@@ -4,14 +4,18 @@ Exposes UP3 mandate-building and verification as a resource on StarmoneyClient.
 The signing primitives are vendored from app/protocols/up3/signing.py (identical
 byte output, same HMAC-SHA256 / JCS algorithm).
 
-UP3 v0.1 is SERVICE ATTESTATION — not user attestation. The HMAC signature
-proves "this Mandate was produced by a process holding the registered signing
-key for `issuer`". User consent lives at the bank's OTP step; both gates must
-hold, but they are independent.
-
-Guardrail: `consent_evidence` defaults to `{"type": "service_attestation",
-"data": {}}`. The `consent_token_v1` user-evidence type is NOT shipped in v0.1
-— attempting to pass it is caller error, not an SDK validation.
+The HMAC signature proves "this Mandate was produced by a process holding the
+registered signing key for `issuer`" — the service's word. Since 0.3.44 (P19,
+owner ruling 13 Nov 2026) the bank also requires, on every send, at least one
+CUSTOMER-PRESENT proof it accepts inside the cart: `consent_evidence` is a
+required argument of every cart builder here and `service_attestation` alone is
+refused by the bank (422 `UP3_TYPE_NOT_ACCEPTED`). The only accepted type today
+is `chat_session_pin_v1` — `{"type": "chat_session_pin_v1", "data":
+{"verified_at", "attempt_count", "session_id_hash"}}`, the chat code the user
+just typed (B-104: one code confirms exactly one send, so mint a fresh block per
+cart). A new evidence type needs the owner's approval and a bank release; the
+SDK does not pre-validate the type beyond refusing `service_attestation`.
+The bank's rail-time authentication (via Dabsi) is unchanged and independent.
 
 Secret loading: the UP3 HMAC secret is the same per-service secret as the JWT
 secret in v0.1 (UP3 spec §10 FAQ). Pass `up3_secret` to `StarmoneyClient`; if
@@ -31,6 +35,30 @@ from .vendor.signing import sign, verify
 
 # ULID alphabet (Crockford base32, uppercase)
 _ULID_ALPHABET = "0123456789ABCDEFGHJKMNPQRSTVWXYZ"
+
+#: The customer-present evidence type the bank accepts today (P19, 0.3.44).
+CHAT_SESSION_PIN_V1 = "chat_session_pin_v1"
+
+
+def _require_consent_evidence(consent_evidence: Any) -> dict[str, Any]:
+    """P19: every cart carries a customer-present proof; refuse locally what the
+    bank would refuse anyway (nothing is signed, nothing is posted)."""
+    if not isinstance(consent_evidence, dict) or "type" not in consent_evidence:
+        raise ValueError(
+            "consent_evidence is required (P19, 0.3.44): every send carries the user's own "
+            'proof, e.g. {"type": "chat_session_pin_v1", "data": {"verified_at": "<RFC 3339 Z>", '
+            '"attempt_count": 1, "session_id_hash": "sha256:<base64url>"}} — the chat code the '
+            "user just typed, one fresh block per cart (B-104)"
+        )
+    if consent_evidence.get("type") == "service_attestation":
+        raise ValueError(
+            "service_attestation is the service's own word and is no longer accepted as the "
+            "cart's consent evidence (bank 422 UP3_TYPE_NOT_ACCEPTED since 0.3.44): pass the "
+            "customer-present proof, chat_session_pin_v1 today"
+        )
+    if not isinstance(consent_evidence.get("data"), dict):
+        raise ValueError("consent_evidence.data must be an object")
+    return consent_evidence
 
 
 def _generate_ulid() -> str:
@@ -230,10 +258,10 @@ class UP3Resource:
         amount_minor: int,
         beneficiary_iban: str,
         beneficiary_name: str,
+        consent_evidence: dict[str, Any],
         rail: Optional[str] = None,
         fees_minor: Optional[dict[str, int]] = None,
         confirmed_at: Optional[str] = None,
-        consent_evidence: Optional[dict[str, Any]] = None,
         ttl_minutes: int = 2,
         idempotency_seed: Optional[str] = None,
     ) -> dict[str, Any]:
@@ -242,9 +270,10 @@ class UP3Resource:
         The cart captures the user's confirmation ("yes, send 5000 to Fatou Ndiaye
         at SN12K..."). Must reference the IntentMandate by id.
 
-        v0.1 guardrail: consent_evidence defaults to service_attestation. Do NOT
-        pass consent_token_v1 until v0.2 — the server rejects it with
-        UP3_TYPE_NOT_ACCEPTED.
+        P19 (0.3.44): ``consent_evidence`` is required and must be a
+        customer-present proof the bank accepts — ``chat_session_pin_v1`` today.
+        ``service_attestation`` is refused here (ValueError) as the bank would
+        (422 ``UP3_TYPE_NOT_ACCEPTED``).
 
         Args:
             intent_mandate: The signed IntentMandate dict from build_intent().
@@ -258,8 +287,12 @@ class UP3Resource:
                         Defaults to empty dict.
             confirmed_at: RFC 3339 Z-suffix timestamp of the user's tap.
                           Defaults to now.
-            consent_evidence: user_consent_evidence dict. Defaults to
-                              {"type": "service_attestation", "data": {}}.
+            consent_evidence: user_consent_evidence dict, REQUIRED:
+                {"type": "chat_session_pin_v1", "data": {"verified_at":
+                "<RFC 3339 Z>", "attempt_count": 1, "session_id_hash":
+                "sha256:<base64url>"}} — the code the user just typed, checked
+                within 300 s of confirmed_at. One fresh block per cart (B-104:
+                a reused act is 409 UP3_EVIDENCE_REUSED).
             ttl_minutes: CartMandate lifetime in minutes (default 2).
             idempotency_seed: Opaque, caller-stable input the cart.id is
                 derived from (e.g. a consent_jti) — NOT the id itself. Pass
@@ -286,12 +319,11 @@ class UP3Resource:
         Returns:
             Signed CartMandate envelope dict ready to POST as cart_mandate.
         """
+        consent_evidence = _require_consent_evidence(consent_evidence)
         if fees_minor is None:
             fees_minor = {}
         if confirmed_at is None:
             confirmed_at = _now_z()
-        if consent_evidence is None:
-            consent_evidence = {"type": "service_attestation", "data": {}}
 
         intent_id = intent_mandate["id"]
         intent_payload = intent_mandate["payload"]
@@ -332,9 +364,9 @@ class UP3Resource:
         intent_mandate: dict[str, Any],
         *,
         quote: dict[str, Any],
+        consent_evidence: dict[str, Any],
         beneficiary_name: Optional[str] = _UNSET,  # type: ignore[assignment]
         confirmed_at: Optional[str] = None,
-        consent_evidence: Optional[dict[str, Any]] = None,
         ttl_minutes: int = 2,
         idempotency_seed: Optional[str] = None,
         execution_mode: Optional[str] = None,
@@ -369,8 +401,9 @@ class UP3Resource:
                 quote's ``display_name`` (which may be ``None``); pass a value
                 only to shorten it the way your screen did.
             confirmed_at: RFC 3339 Z timestamp of the user's tap. Defaults to now.
-            consent_evidence: ``user_consent_evidence``; defaults to
-                ``{"type": "service_attestation", "data": {}}``.
+            consent_evidence: ``user_consent_evidence``, REQUIRED (P19): the
+                customer-present proof, ``chat_session_pin_v1`` today, a fresh
+                block per cart. Same contract as :meth:`build_cart`.
             ttl_minutes: Cart lifetime (default 2), clamped to the quote's.
             idempotency_seed: Same contract as :meth:`build_cart` — the SAME
                 seed on a transport retry of the SAME authorization derives
@@ -387,9 +420,11 @@ class UP3Resource:
 
         Raises:
             ValueError: the quote dict lacks the keys a 0.2 cart signs, or is
-                a ``deferred`` quote.
+                a ``deferred`` quote, or ``consent_evidence`` is missing /
+                ``service_attestation`` (P19).
         """
         _check_execution_mode(execution_mode)
+        consent_evidence = _require_consent_evidence(consent_evidence)
         try:
             ref = quote["quote"]
             quote_id, digest, digest_alg = ref["id"], ref["digest"], ref["digest_alg"]
@@ -412,8 +447,6 @@ class UP3Resource:
             beneficiary_name = quote.get("display_name")
         if confirmed_at is None:
             confirmed_at = _now_z()
-        if consent_evidence is None:
-            consent_evidence = {"type": "service_attestation", "data": {}}
 
         intent_id = intent_mandate["id"]
         intent_payload = intent_mandate["payload"]
@@ -457,11 +490,11 @@ class UP3Resource:
         refusal: dict[str, Any],
         beneficiary_value: str,
         amount_minor: int,
+        consent_evidence: dict[str, Any],
         currency: str = "XOF",
         execute_before: Optional[str] = None,
         hold_days: int = 7,
         confirmed_at: Optional[str] = None,
-        consent_evidence: Optional[dict[str, Any]] = None,
         ttl_minutes: int = 2,
         idempotency_seed: Optional[str] = None,
         execution_mode: Optional[str] = None,
@@ -499,8 +532,9 @@ class UP3Resource:
             hold_days: Default window length when ``execute_before`` is not
                 given (1–7; the bank caps the hold at 7 days).
             confirmed_at: RFC 3339 Z timestamp of the user's tap. Defaults to now.
-            consent_evidence: ``user_consent_evidence``; defaults to
-                ``{"type": "service_attestation", "data": {}}``.
+            consent_evidence: ``user_consent_evidence``, REQUIRED (P19): the
+                customer-present proof, ``chat_session_pin_v1`` today, a fresh
+                block per cart. Same contract as :meth:`build_cart`.
             ttl_minutes: Cart lifetime (default 2), clamped to the quote's (P12).
             idempotency_seed: Same contract as :meth:`build_cart`: the SAME seed
                 on a retry derives the same ``cart.id``, which is the
@@ -524,9 +558,11 @@ class UP3Resource:
 
         Raises:
             ValueError: no deferred quote in the refusal, a non-E.164 phone, a
-                non-positive amount, or ``hold_days`` outside 1–7.
+                non-positive amount, ``hold_days`` outside 1–7, or
+                ``consent_evidence`` missing / ``service_attestation`` (P19).
         """
         _check_execution_mode(execution_mode)
+        consent_evidence = _require_consent_evidence(consent_evidence)
         dq = refusal.get("deferred_quote") if "deferred_quote" in refusal else refusal
         if not isinstance(dq, dict) or "digest" not in dq:
             raise ValueError(
@@ -553,8 +589,6 @@ class UP3Resource:
             execute_before = (anchor + timedelta(days=int(hold_days))).strftime("%Y-%m-%dT%H:%M:%SZ")
         else:
             execute_before = _to_z(execute_before)
-        if consent_evidence is None:
-            consent_evidence = {"type": "service_attestation", "data": {}}
 
         intent_id = intent_mandate["id"]
         intent_payload = intent_mandate["payload"]

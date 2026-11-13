@@ -8,6 +8,7 @@ POST /v1/deferred-transfers/{id}/cancel.
 from typing import TYPE_CHECKING, Any, Literal, Optional, TypedDict
 
 from ..http_client import HTTPClient
+from ..up3.resource import _require_consent_evidence
 
 if TYPE_CHECKING:  # pragma: no cover
     from ..up3.resource import UP3Resource
@@ -93,7 +94,15 @@ class DeferredTransfersResource:
         cart_mandate: Optional[dict[str, Any]] = None,
     ) -> dict[str, Any]:
         """
-        Create a deferred-trigger transfer (send-half).
+        Create a deferred-trigger transfer (send-half). Low-level; prefer
+        :meth:`send_with_mandates`, which builds the chain for you.
+
+        P19 (0.3.44): the bank refuses a send WITHOUT ``intent_mandate`` +
+        ``cart_mandate`` with 409 ``UP3_MANDATE_REQUIRED`` for every service
+        but its own, before any hold is placed; the cart must carry a
+        customer-present proof (``chat_session_pin_v1`` today), else 422
+        ``UP3_TYPE_NOT_ACCEPTED``. The ``quote_id=`` and full-instruction
+        shapes below remain only for the bank's own service.
 
         Three ways to name the instruction:
 
@@ -242,12 +251,12 @@ class DeferredTransfersResource:
         refusal: dict[str, Any],
         beneficiary_value: str,
         amount_minor: int,
+        consent_token: dict[str, Any],
         currency: Literal["XOF"] = "XOF",
         execute_before: Optional[str] = None,
         hold_days: int = 7,
         description: Optional[str] = None,
         client_reference: Optional[str] = None,
-        consent_token: Optional[dict[str, Any]] = None,
         intent_ttl_minutes: int = 15,
         cart_ttl_minutes: int = 2,
         idempotency_seed: Optional[str] = None,
@@ -283,7 +292,12 @@ class DeferredTransfersResource:
                 Sent in the request body (the signed cart carries no wording) and
                 also used as the intent's human echo, as in ``payments.send_with_mandates``;
                 the bank refuses one over 30 characters with 422.
-            consent_token: ``user_consent_evidence`` (the ConsentToken).
+            consent_token: ``user_consent_evidence``, REQUIRED (P19, 0.3.44):
+                the customer-present proof, ``chat_session_pin_v1`` today
+                (``{verified_at, attempt_count, session_id_hash}``), one fresh
+                block per hold (B-104). ``service_attestation`` raises
+                ValueError here as the bank would refuse it (422
+                ``UP3_TYPE_NOT_ACCEPTED``).
             idempotency_seed: The retry anchor (e.g. the consent jti).
 
         Returns:
@@ -291,7 +305,8 @@ class DeferredTransfersResource:
             and ``cart_mandate`` that were posted.
 
         Raises:
-            ValueError: no deferred quote, or ``hold_days`` outside 1–7.
+            ValueError: no deferred quote, ``hold_days`` outside 1–7, or
+                ``consent_token`` missing / ``service_attestation`` (P19).
             APIError subclasses with the B-32 envelope — ``QUOTE_MISMATCH``,
             ``UP3_QUOTE_DRIFT`` / ``UP3_REPLAY`` / ``UP3_EXPIRED`` (quote
             state), ``UP3_EXECUTION_WINDOW_INVALID`` (R1–R4),
@@ -304,6 +319,7 @@ class DeferredTransfersResource:
                 "UP3 resource not wired — use StarMoneyClient.deferred_transfers (the client sets "
                 "it) or assign resource._up3 = client.up3"
             )
+        consent_token = _require_consent_evidence(consent_token)
         intent = self._up3.build_intent(
             user_ref=user_ref,
             description=description
