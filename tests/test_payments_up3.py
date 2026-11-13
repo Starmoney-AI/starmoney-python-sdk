@@ -363,6 +363,7 @@ def test_up3_error_code_map_covers_all_13_codes():
         "UP3_REVISION_REGRESSION",
         "UP3_EXECUTION_MODE_MISMATCH",
         "UP3_CART_ABANDONED",
+        "UP3_EVIDENCE_REUSED",  # B-104 (0.3.43)
     }
     assert set(UP3_ERROR_CODE_MAP.keys()) == expected_codes
 
