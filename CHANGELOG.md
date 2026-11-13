@@ -2,7 +2,7 @@
 
 ## [Unreleased]
 
-- Service-side only (React backoffice read views, PR #343). No SDK surface change.
+- Service-side only (React backoffice read views, PR #343; the backoffice is now React only at `/admin`, with its login and grid writes as JSON under `/admin/api`). No SDK surface change.
 
 - Version bump in lockstep with the service (B-107 request telemetry: the bank now logs one redacted line per request and per handler run; nothing changes on the wire). No SDK surface change.
 
