@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+## [0.3.42] — 2026-11-13
+
+- Version bump in lockstep with the service (B-102 follow-up: the bank dropped the 24 h sticky refusal — every attempt re-checks the payee's balance, so a `RecipientLimitReachedError` can be followed by an accepted send as soon as the payee spends down; retrying is harmless). No SDK surface change.
+
 ## [0.3.41] — 2026-11-13
 
 - B-102, the payee cap: `payments.quote(...)`, `payments.send(...)` / `send_with_mandates(...)` and `deferred_transfers.send(...)` / `send_with_mandates(...)` can raise **`RecipientLimitReachedError`** (403 `RECIPIENT_LIMIT_REACHED`): the recipient's unverified or new account cannot hold the amount. Nothing was written; the error carries no figure (the payee's balance is theirs) — show «{name} a atteint la limite de son compte» and suggest they verify. A sender refused 3 times toward one payee in 24 h is refused every amount to that payee for the window. `LedgerUnavailableError` (503) can also come from those calls when the recipient's ledger account could not be read.
