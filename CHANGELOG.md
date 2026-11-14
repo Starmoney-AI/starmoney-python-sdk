@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- B-110: `payments.quote(..., funding_rail="viban" | "bdk")` — the account the customer picked to pay from; omitted = the bank's default, as before. A pick the sender cannot pay from raises `404 NO_VIBAN_ACCOUNT` / `RAIL_NOT_LINKED`. Additive.
+
 ## [0.3.45] — 2026-11-14
 
 - Service-side only (React backoffice read views, PR #343; the backoffice is now React only at `/admin`, with its login and grid writes as JSON under `/admin/api`). No SDK surface change.
