@@ -33,6 +33,25 @@ async def test_quote_posts_the_identifier_and_amount():
 
 
 @pytest.mark.asyncio
+async def test_quote_sends_the_account_the_customer_picked():
+    """B-110: the paying account is the customer's pick; omitted = not sent."""
+    http = MagicMock()
+    response = MagicMock()
+    response.json.return_value = {"quote": {"id": "q1"}, "funding_rail": "bdk"}
+    http.post = AsyncMock(return_value=response)
+
+    await PaymentsResource(http).quote(
+        "user-1",
+        beneficiary_type="iban",
+        beneficiary_value="SN17SN0100152000025690007546",
+        amount_minor=50000,
+        funding_rail="bdk",
+    )
+
+    assert http.post.await_args.kwargs["json"]["funding_rail"] == "bdk"
+
+
+@pytest.mark.asyncio
 async def test_send_with_quote_id_posts_the_quote_and_nothing_it_does_not_know():
     """Confirm by quote (0.3.0): amount / IBAN come from the quote server-side,
     so the SDK sends only what the caller gave."""

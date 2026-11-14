@@ -224,6 +224,7 @@ class PaymentsResource:
         beneficiary_value: str,
         amount_minor: int,
         currency: str = "XOF",
+        funding_rail: Optional[str] = None,
     ) -> dict[str, Any]:
         """
         Preview one transfer before the PIN (transfer routes, PR-A):
@@ -239,6 +240,10 @@ class PaymentsResource:
             beneficiary_value: The identifier as the customer named it.
             amount_minor: Amount in minor units (XOF has none: 1 F = 1).
             currency: ISO 4217, default XOF.
+            funding_rail: B-110 (0.3.48): the account the customer picked to pay
+                from, ``"viban"`` (their StarMoney vIBAN) or ``"bdk"`` (their
+                linked BDK account). Omitted: the vIBAN when payable, else BDK.
+                The confirm pays from the account the quote was priced for.
 
         Returns:
             PaymentQuoteResponse dict: ``quote {id, digest, digest_alg,
@@ -265,12 +270,17 @@ class PaymentsResource:
                 figure; also on a ``deferred`` outcome when the number belongs
                 to a holder still opening or unverified. 503 LEDGER_UNAVAILABLE
                 when the payee's ledger could not be read (refused, not guessed).
+            404 NO_VIBAN_ACCOUNT (``funding_rail="viban"``, no payable vIBAN) /
+                RAIL_NOT_LINKED (``funding_rail="bdk"``, no linked BDK account):
+                the picked account cannot pay; it is never swapped for another.
         """
         payload: dict[str, Any] = {
             "beneficiary": {"type": beneficiary_type, "value": beneficiary_value},
             "amount_minor": int(amount_minor),
             "currency": currency,
         }
+        if funding_rail is not None:
+            payload["funding_rail"] = funding_rail
         response = await self.http.post("/payments/quotes", json=payload, user_id=user_id)
         return response.json()
 

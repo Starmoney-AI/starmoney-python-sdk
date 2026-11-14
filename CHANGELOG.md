@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+## [0.3.48] — 2026-11-14
+
+- B-110: `payments.quote(..., funding_rail="viban" | "bdk")` — the account the customer picked to pay from; omitted = the default as before (the vIBAN when payable, else BDK). A pick the sender cannot pay from raises `404 NO_VIBAN_ACCOUNT` / `RAIL_NOT_LINKED`. Additive.
+
 ## [0.3.47] — 2026-11-14
 
 No SDK change; lockstep with service 0.3.47 (B-108 webhook-secret fix and go-metrics, both service-side).
