@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+## [0.3.47] — 2026-11-14
+
+No SDK change; lockstep with service 0.3.47 (B-108 webhook-secret fix and go-metrics, both service-side).
+
 ## [0.3.46] — 2026-11-14
 
 No SDK change; lockstep with service 0.3.46 (deploy-script fix for B-107 telemetry).
