@@ -308,7 +308,11 @@ class InstitutionAlreadyLinkedError(APIError):
     B-101). One account per institution; the stored IBAN is unchanged. Tell the
     holder which account is linked (``linked_account_reference_masked``, last 4
     only); to change it, ``unlink_rail`` then ``link_rail``. Linking the SAME IBAN
-    again is not an error (200 ``already_linked``)."""
+    again is not an error (200 ``already_linked``).
+
+    RETIRED in service 0.3.51 (B-112): a different IBAN at the same bank is now a
+    new link, so the service no longer raises this. Kept so existing ``except``
+    clauses still import."""
 
     @property
     def institution_code(self) -> Optional[str]:
@@ -317,6 +321,38 @@ class InstitutionAlreadyLinkedError(APIError):
     @property
     def linked_account_reference_masked(self) -> Optional[str]:
         return self.response_data.get("linked_account_reference_masked")
+
+
+class LinkLimitReachedError(APIError):
+    """409 - the holder already has the maximum number of linked accounts
+    (``error_code == "LINK_LIMIT_REACHED"``, B-112, service 0.3.51; 5, all banks
+    together). Nothing was linked. ``limit`` is the cap; unlink one to link another."""
+
+    @property
+    def limit(self) -> Optional[int]:
+        return self.response_data.get("limit")
+
+
+class LinkNotFoundError(APIError):
+    """404 - the ``link_id`` names none of the holder's active linked accounts
+    (``error_code == "LINK_NOT_FOUND"``, B-112, service 0.3.51): unknown, unlinked,
+    or another holder's (one answer for all three). On a quote, the picked account
+    is never swapped for another; on a confirm, preview again."""
+
+    @property
+    def link_id(self) -> Optional[str]:
+        return self.response_data.get("link_id")
+
+
+class LinkIdRequiredError(APIError):
+    """409 - a per-rail call (``unlink_rail``, ``set_rail_account_reference``) is
+    ambiguous because the holder linked several accounts on that rail
+    (``error_code == "LINK_ID_REQUIRED"``, B-112, service 0.3.51). Nothing changed;
+    use the per-link call (``unlink_link``) with a ``link_id`` from ``links()``."""
+
+    @property
+    def rail_name(self) -> Optional[str]:
+        return self.response_data.get("rail_name")
 
 
 class FundingRailChangedError(APIError):
