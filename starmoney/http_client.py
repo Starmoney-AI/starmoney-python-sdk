@@ -28,6 +28,9 @@ from .exceptions import (
     LinkedAccountReferenceMissingError,
     LinkedAccountRejectedError,
     InstitutionAlreadyLinkedError,
+    LinkIdRequiredError,
+    LinkLimitReachedError,
+    LinkNotFoundError,
     LinkVerificationFailedError,
     NoVibanAccountError,
     PaymentNotFoundError,
@@ -188,6 +191,12 @@ class HTTPClient:
             raise LinkVerificationFailedError(response.status_code, message, error_data)
         if error_code == "INSTITUTION_ALREADY_LINKED":
             raise InstitutionAlreadyLinkedError(response.status_code, message, error_data)
+        if error_code == "LINK_LIMIT_REACHED":
+            raise LinkLimitReachedError(response.status_code, message, error_data)
+        if error_code == "LINK_NOT_FOUND":
+            raise LinkNotFoundError(response.status_code, message, error_data)
+        if error_code == "LINK_ID_REQUIRED":
+            raise LinkIdRequiredError(response.status_code, message, error_data)
         if error_code == "FUNDING_RAIL_CHANGED":
             raise FundingRailChangedError(response.status_code, message, error_data)
 
@@ -282,6 +291,10 @@ class HTTPClient:
     async def put(self, path: str, user_id: Optional[str] = None, **kwargs: Any) -> httpx.Response:
         """Make PUT request."""
         return await self.request("PUT", path, user_id=user_id, **kwargs)
+
+    async def patch(self, path: str, user_id: Optional[str] = None, **kwargs: Any) -> httpx.Response:
+        """PATCH request"""
+        return await self.request("PATCH", path, user_id=user_id, **kwargs)
 
     async def delete(
         self, path: str, user_id: Optional[str] = None, **kwargs: Any

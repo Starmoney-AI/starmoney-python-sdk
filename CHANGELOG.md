@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- B-112 (service 0.3.51): several named linked accounts; the customer picks which pays. `accounts.link_rail(..., nickname=)` (1–40 characters, seen only by the holder; on `already_linked` it renames); a different IBAN at a bank already linked is now a new link. New `accounts.links(user_id)` (`{links, max_links}`, linking order, the first is the default), `accounts.rename_link(user_id, link_id, nickname)` (None clears), `accounts.unlink_link(user_id, link_id)`, `accounts.get_linked_balance(..., link_id=)`, `payments.quote(..., funding_link_id=)`. New typed errors `LinkLimitReachedError` (409 `LINK_LIMIT_REACHED`, `limit`), `LinkNotFoundError` (404 `LINK_NOT_FOUND`, `link_id`), `LinkIdRequiredError` (409 `LINK_ID_REQUIRED`, `rail_name`, from `unlink_rail` / `set_rail_account_reference` when several accounts are linked on the rail). `InstitutionAlreadyLinkedError` is kept for imports but the service no longer raises it. `HTTPClient.patch` added. Additive.
+
 ## [0.3.48] — 2026-11-14
 
 - B-110: `payments.quote(..., funding_rail="viban" | "bdk")` — the account the customer picked to pay from; omitted = the default as before (the vIBAN when payable, else BDK). A pick the sender cannot pay from raises `404 NO_VIBAN_ACCOUNT` / `RAIL_NOT_LINKED`. Additive.

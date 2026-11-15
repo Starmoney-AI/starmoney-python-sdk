@@ -225,6 +225,7 @@ class PaymentsResource:
         amount_minor: int,
         currency: str = "XOF",
         funding_rail: Optional[str] = None,
+        funding_link_id: Optional[str] = None,
     ) -> dict[str, Any]:
         """
         Preview one transfer before the PIN (transfer routes, PR-A):
@@ -244,6 +245,11 @@ class PaymentsResource:
                 from, ``"viban"`` (their StarMoney vIBAN) or ``"bdk"`` (their
                 linked BDK account). Omitted: the vIBAN when payable, else BDK.
                 The confirm pays from the account the quote was priced for.
+            funding_link_id: B-112 (0.3.51): which linked account pays, by its
+                ``link_id`` from ``accounts.links()`` (e.g. «Épargne», not the
+                first-linked «Salaire»). Implies ``funding_rail="bdk"``; omitted,
+                a BDK-funded send pays from the first-linked account. Echoed on
+                the response and pinned on the send.
 
         Returns:
             PaymentQuoteResponse dict: ``quote {id, digest, digest_alg,
@@ -273,6 +279,9 @@ class PaymentsResource:
             404 NO_VIBAN_ACCOUNT (``funding_rail="viban"``, no payable vIBAN) /
                 RAIL_NOT_LINKED (``funding_rail="bdk"``, no linked BDK account):
                 the picked account cannot pay; it is never swapped for another.
+            LinkNotFoundError 404 LINK_NOT_FOUND: ``funding_link_id`` is not one of
+                the sender's linked accounts. ValidationError 400 VALIDATION_FAILED
+                (``errors[0].field == "funding_link_id"``) with ``funding_rail="viban"``.
         """
         payload: dict[str, Any] = {
             "beneficiary": {"type": beneficiary_type, "value": beneficiary_value},
@@ -281,6 +290,8 @@ class PaymentsResource:
         }
         if funding_rail is not None:
             payload["funding_rail"] = funding_rail
+        if funding_link_id is not None:
+            payload["funding_link_id"] = funding_link_id
         response = await self.http.post("/payments/quotes", json=payload, user_id=user_id)
         return response.json()
 

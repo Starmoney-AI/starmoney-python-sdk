@@ -114,6 +114,7 @@ class AccountsResource:
         rail_name: str = "BDK",
         *,
         account_reference: Optional[str] = None,
+        nickname: Optional[str] = None,
     ) -> dict[str, Any]:
         """
         Link a payment rail to user's account.
@@ -132,7 +133,12 @@ class AccountsResource:
                 B-95 (service 0.3.19): REQUIRED on a first BDK link — the
                 bank links the account it has registered for the holder's
                 phone + this IBAN, after BDK confirms it. The BDK login
-                never leaves the bank.
+                never leaves the bank. B-112 (0.3.51): a DIFFERENT IBAN at a
+                bank already linked is a new link (up to 5 accounts in all).
+            nickname: B-112 (0.3.51): the holder's own name for this account,
+                1–40 characters after trimming, no control characters, seen
+                only by the holder (e.g. «Épargne»). On ``already_linked`` it
+                renames the account.
 
         Returns:
             Rail link confirmation data; ``account`` is the listing's
@@ -147,11 +153,11 @@ class AccountsResource:
                 «another phone»).
             LinkVerificationFailedError: 409 — the registered account did not
                 verify at BDK.
-            InstitutionAlreadyLinkedError: 409 (B-101) — an account is already
-                linked at this institution and ``account_reference`` is a
-                different IBAN; ``linked_account_reference_masked`` names the
-                linked one, which is unchanged. Unlink first to change it. The
-                same IBAN again is 200 ``already_linked``.
+            LinkLimitReachedError: 409 (B-112) — the holder already linked 5
+                accounts; nothing linked (``limit``).
+            APIError: 422 ``VALIDATION_FAILED`` (``errors[0].field ==
+                "nickname"``) — empty after trimming, over 40 characters, or
+                with a control character.
             BankUnavailableError: 503 — BDK could not be reached; retry.
 
         Example:
@@ -164,6 +170,8 @@ class AccountsResource:
         payload: dict[str, Any] = {}
         if account_reference is not None:
             payload["account_reference"] = account_reference
+        if nickname is not None:
+            payload["nickname"] = nickname
         kwargs: dict[str, Any] = {"json": payload} if payload else {}
         response = await self.http.post(f"/accounts/rails/{rail_name}", user_id=user_id, **kwargs)
         return response.json()
@@ -182,6 +190,8 @@ class AccountsResource:
         Raises:
             PaymentNotFoundError: the SDK's 404 class — ``RAIL_NOT_LINKED``,
                 nothing is linked on that rail.
+            LinkIdRequiredError: 409 (B-112) — several accounts are linked on
+                that rail; use ``unlink_link`` with a ``link_id``.
 
         Example:
             ```python
@@ -189,6 +199,65 @@ class AccountsResource:
             ```
         """
         response = await self.http.delete(f"/accounts/rails/{rail_name}", user_id=user_id)
+        return response.json()
+
+    async def links(self, user_id: str) -> dict[str, Any]:
+        """
+        Every account the holder linked, in linking order (B-112, service 0.3.51).
+
+        The first is the default: it pays a BDK-funded send that names no link.
+        Never a balance (read one with ``get_linked_balance(link_id=...)``).
+
+        Returns:
+            ``{"links": [{link_id, rail_name, display_name, account_reference,
+            account_reference_masked, nickname, linked_at}], "max_links": 5}``
+
+        Example:
+            ```python
+            listed = await client.accounts.links(user_id)
+            [(x["nickname"], x["account_reference_masked"]) for x in listed["links"]]
+            # [("Salaire", "SN……0101"), ("Épargne", "SN……0202")]
+            ```
+        """
+        response = await self.http.get("/accounts/links", user_id=user_id)
+        return response.json()
+
+    async def rename_link(
+        self, user_id: str, link_id: str, nickname: Optional[str]
+    ) -> dict[str, Any]:
+        """
+        Name (or, with ``None``, un-name) one linked account (B-112, service 0.3.51).
+
+        ``nickname``: 1–40 characters after trimming, no control characters, seen
+        only by the holder.
+
+        Returns:
+            The link, as one ``links()`` entry.
+
+        Raises:
+            LinkNotFoundError: 404 — not one of the holder's active links.
+            APIError: 422 ``VALIDATION_FAILED`` — the nickname breaks the rules
+                above.
+        """
+        response = await self.http.patch(
+            f"/accounts/links/{link_id}", user_id=user_id, json={"nickname": nickname}
+        )
+        return response.json()
+
+    async def unlink_link(self, user_id: str, link_id: str) -> dict[str, Any]:
+        """
+        Unlink one account; the holder's other links stay (B-112, service 0.3.51).
+
+        Unlinking the default makes the next-oldest link the default. The holder
+        stays verified (B-111): KYC is a property of the person.
+
+        Returns:
+            ``{"link_id": ..., "rail_name": "bdk", "status": "unlinked"}``
+
+        Raises:
+            LinkNotFoundError: 404 — not one of the holder's active links.
+        """
+        response = await self.http.delete(f"/accounts/links/{link_id}", user_id=user_id)
         return response.json()
 
     async def set_rail_account_reference(
@@ -215,6 +284,8 @@ class AccountsResource:
                 shape/country/length or the mod-97 check; nothing stored.
             PaymentNotFoundError: the SDK's 404 class — ``RAIL_NOT_LINKED``, the
                 holder has no linked account on that rail; link first.
+            LinkIdRequiredError: 409 (B-112) — several accounts are linked on
+                that rail; this per-rail call cannot pick one.
 
         Example:
             ```python
@@ -521,7 +592,9 @@ class AccountsResource:
         response = await self.http.get("/accounts/balance", user_id=user_id)
         return response.json()
 
-    async def get_linked_balance(self, user_id: str, rail_name: str = "bdk") -> dict[str, Any]:
+    async def get_linked_balance(
+        self, user_id: str, rail_name: str = "bdk", *, link_id: Optional[str] = None
+    ) -> dict[str, Any]:
         """
         The balance of the holder's linked BDK account, read live from BDK (B-92).
 
@@ -531,6 +604,9 @@ class AccountsResource:
         Example: available 1 536 228, booked 1 711 576, reserved 175 348.
 
         Auth: user-scoped JWT (``user_id`` mints the sub claim).
+
+        ``link_id`` (B-112, 0.3.51): which linked account, from ``links()``;
+        omitted, the first-linked one.
 
         Returns:
             dict with the same keys as ``get_balance``: account_reference (the
@@ -542,8 +618,12 @@ class AccountsResource:
             LinkedAccountReferenceMissingError (409): the IBAN was never given.
             LinkedAccountRejectedError (409): BDK refused the saved IBAN.
             BankUnavailableError (503): BDK could not be read; retry.
+            LinkNotFoundError (404, B-112): ``link_id`` is not the holder's.
         """
-        response = await self.http.get(f"/accounts/rails/{rail_name}/balance", user_id=user_id)
+        kwargs: dict[str, Any] = {"params": {"link_id": link_id}} if link_id else {}
+        response = await self.http.get(
+            f"/accounts/rails/{rail_name}/balance", user_id=user_id, **kwargs
+        )
         return response.json()
 
     async def submit_kyc(
