@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+## [0.3.50] — 2026-11-15
+
+No SDK change; lockstep with service 0.3.50 (B-111: a BDK link verifies the holder, service-side; `account.kyc.verified` arrives as before).
+
 ## [0.3.49] — 2026-11-14
 
 No SDK change; lockstep with service 0.3.49 (B-109 top-up). A top-up is `payments.quote(..., beneficiary_type="iban", beneficiary_value=<own vIBAN>, funding_rail="bdk")`, available since 0.3.48.
