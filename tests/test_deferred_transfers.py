@@ -141,8 +141,22 @@ async def test_get_calls_correct_path():
 
     result = await resource.get("dt-uuid-1")
 
-    http.get.assert_called_once_with("/deferred-transfers/dt-uuid-1")
+    http.get.assert_called_once_with("/deferred-transfers/dt-uuid-1", user_id=None)
     assert result["id"] == "dt-uuid-1"
+
+
+@pytest.mark.asyncio
+async def test_get_is_read_as_the_sender():
+    """B-115: Awa reads her own unclaimed send back, full number included."""
+    resource, http = _make_resource()
+    mock_resp = MagicMock()
+    mock_resp.json.return_value = _DT_RESPONSE
+    http.get = AsyncMock(return_value=mock_resp)
+
+    result = await resource.get("dt-uuid-1", user_id="user-1")
+
+    http.get.assert_called_once_with("/deferred-transfers/dt-uuid-1", user_id="user-1")
+    assert result["recipient_handle"] == "+221770000001"
 
 
 # ---------------------------------------------------------------------------
