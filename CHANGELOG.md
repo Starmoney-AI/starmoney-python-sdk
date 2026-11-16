@@ -2,6 +2,7 @@
 
 ## [Unreleased]
 
+- B-113 (service 0.3.52): `own_account_transfer: bool` on `PaymentReceivedPayload` (required: the payer is the holder credited, e.g. a top-up), on `PaymentInitiatedPayload`, `PaymentRailFailedPayload`, `PaymentBankStatusPayload` and `PaymentReversedPayload` (the credited account is the payer's own), and on `TransferHistoryRow` (both directions). Read with `.get("own_account_transfer", False)` against a bank older than 0.3.52. Additive.
 - B-112 (service 0.3.51): several named linked accounts; the customer picks which pays. `accounts.link_rail(..., nickname=)` (1–40 characters, seen only by the holder; on `already_linked` it renames); a different IBAN at a bank already linked is now a new link. New `accounts.links(user_id)` (`{links, max_links}`, linking order, the first is the default), `accounts.rename_link(user_id, link_id, nickname)` (None clears), `accounts.unlink_link(user_id, link_id)`, `accounts.get_linked_balance(..., link_id=)`, `payments.quote(..., funding_link_id=)`. New typed errors `LinkLimitReachedError` (409 `LINK_LIMIT_REACHED`, `limit`), `LinkNotFoundError` (404 `LINK_NOT_FOUND`, `link_id`), `LinkIdRequiredError` (409 `LINK_ID_REQUIRED`, `rail_name`, from `unlink_rail` / `set_rail_account_reference` when several accounts are linked on the rail). `InstitutionAlreadyLinkedError` is kept for imports but the service no longer raises it. `HTTPClient.patch` added. Additive.
 
 ## [0.3.48] — 2026-11-14
