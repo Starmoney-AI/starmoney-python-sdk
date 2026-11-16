@@ -194,6 +194,24 @@ class PreKycTotalCeilingExceededError(APIError):
         return self.response_data.get("remaining_minor")
 
 
+class PreKycMonthlyCeilingExceededError(PreKycTotalCeilingExceededError):
+    """403 - the send would take the holder's sends of the current UTC calendar
+    month past the pre-KYC monthly ceiling
+    (``error_code == "PRE_KYC_MONTHLY_CEILING_EXCEEDED"``, service 0.3.53, B-114).
+
+    A subclass of ``PreKycTotalCeilingExceededError``: a handler written for the
+    lifetime refusal still catches it, with the same figures. ``resets_on`` is
+    the first day of next month (UTC, ISO date) when the count starts again.
+    Example: Moussa (unverified) sent 150 000 F on 3 Nov; on 20 Nov a 60 000 F
+    send is refused with ``remaining_minor`` 50 000 and ``resets_on``
+    ``"2026-12-01"``. Lifted when the bank verifies the holder.
+    """
+
+    @property
+    def resets_on(self) -> Optional[str]:
+        return self.response_data.get("resets_on")
+
+
 class SelfTransferNotAllowedError(APIError):
     """422 ``SELF_TRANSFER_NOT_ALLOWED`` — the number, handle or vIBAN is the
     caller's own (B-27 contract §1/§5). Raised by ``beneficiaries.create``,

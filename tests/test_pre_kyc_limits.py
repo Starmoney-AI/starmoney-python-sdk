@@ -8,6 +8,7 @@ import pytest
 from starmoney.exceptions import (
     InvalidIBANError,
     PreKycCeilingExceededError,
+    PreKycMonthlyCeilingExceededError,
     PreKycTotalCeilingExceededError,
 )
 from starmoney.http_client import HTTPClient
@@ -45,6 +46,46 @@ def test_total_ceiling_refusal_is_typed_and_carries_the_figures():
     )
 
 
+def test_monthly_ceiling_refusal_is_typed_carries_resets_on_and_is_still_a_total_error():
+    """B-114 (0.3.53): Moussa sent 150 000 F on 3 Nov; on 20 Nov a 60 000 F send is refused."""
+    with pytest.raises(PreKycMonthlyCeilingExceededError) as err:
+        _handle(
+            _error(
+                403,
+                {
+                    "error_code": "PRE_KYC_MONTHLY_CEILING_EXCEEDED",
+                    "detail": "send 60000 exceeds the remaining pre-KYC send allowance 50000",
+                    "ceiling_minor": 200000,
+                    "consumed_minor": 150000,
+                    "pending_minor": 0,
+                    "remaining_minor": 50000,
+                    "resets_on": "2026-12-01",
+                },
+            )
+        )
+    exc = err.value
+    assert exc.status_code == 403
+    assert (exc.ceiling_minor, exc.consumed_minor, exc.pending_minor, exc.remaining_minor) == (
+        200000, 150000, 0, 50000,
+    )
+    assert exc.resets_on == "2026-12-01"
+    # a handler written for the lifetime refusal still catches it
+    assert isinstance(exc, PreKycTotalCeilingExceededError)
+
+
+def test_monthly_ceiling_error_is_exported_from_the_package():
+    import starmoney
+
+    assert starmoney.PreKycMonthlyCeilingExceededError is PreKycMonthlyCeilingExceededError
+    assert "PreKycMonthlyCeilingExceededError" in starmoney.__all__
+
+
+def test_the_lifetime_refusal_has_no_resets_on_and_is_not_a_monthly_error():
+    with pytest.raises(PreKycTotalCeilingExceededError) as err:
+        _handle(_error(403, {"error_code": "PRE_KYC_TOTAL_CEILING_EXCEEDED", "detail": "x"}))
+    assert not isinstance(err.value, PreKycMonthlyCeilingExceededError)
+
+
 def test_per_send_refusal_is_a_distinct_type():
     with pytest.raises(PreKycCeilingExceededError) as err:
         _handle(_error(403, {"error_code": "PRE_KYC_CEILING_EXCEEDED", "detail": "too much"}))
@@ -60,6 +101,18 @@ async def test_get_limits_returns_the_status_limits_and_empty_when_verified():
 
     http.get = AsyncMock(return_value=MagicMock(json=lambda: {"account_state": "verified"}))
     assert await AccountsResource(http).get_limits("user-1") == []
+
+
+@pytest.mark.asyncio
+async def test_get_limits_passes_the_monthly_item_with_its_reset_day_through():
+    http = MagicMock()
+    item = {
+        "kind": "pre_kyc_monthly_sends", "direction": "outbound", "period": "calendar_month",
+        "ceiling_minor": 200000, "consumed_minor": 150000, "pending_minor": 0,
+        "remaining_minor": 50000, "resets_on": "2026-12-01", "enforced": True,
+    }
+    http.get = AsyncMock(return_value=MagicMock(json=lambda: {"account_state": "active_pre_kyc", "limits": [item]}))
+    assert await AccountsResource(http).get_limits("user-1") == [item]
 
 
 @pytest.mark.asyncio
