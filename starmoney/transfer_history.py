@@ -79,6 +79,11 @@ class TransferHistoryRow(_TransferHistoryRowBase, total=False):
     # ``counterparty_name`` stays the verified holder name.
     payee_id: Optional[str]
     payee_name: Optional[str]
+    # Bank B-113 (0.3.52): the money moved between two of the holder's own
+    # accounts. out: the send credited their own vIBAN or linked account (a
+    # top-up); in: the credit of such a send. False otherwise and on rows from
+    # before 0.3.52; absent from an older bank.
+    own_account_transfer: bool
 
 
 class TransferHistoryPage(TypedDict):
