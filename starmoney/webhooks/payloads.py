@@ -182,6 +182,11 @@ class _PaymentReceivedPayloadRequired(TypedDict):
     # no payer). Read with ``.get()`` against a bank older than 0.3.20.
     sender_phone: Optional[str]
     sender_iban: Optional[str]
+    # Bank B-113 (0.3.52): the payer is the holder credited, e.g. Awa's top-up
+    # from her linked BDK account lands on her vIBAN; False for every other
+    # credit. Always present on the wire; read with ``.get(..., False)`` against
+    # a bank older than 0.3.52.
+    own_account_transfer: bool
     metadata: WebhookMetadata
 
 
@@ -331,6 +336,11 @@ class PaymentInitiatedPayload(_PaymentInitiatedPayloadRequired, total=False):
     # 0.3.22 (fee grid v2): which pricing segment and which rail paid for the send.
     segment: FeeSegment
     funding_rail: FundingRail
+    # Bank B-113 (0.3.52): the credited account is the payer's own (a top-up from
+    # a linked account to the vIBAN, a send to their own linked account); False
+    # for a send to anyone else. Added at fan-out to every payment.* event, like
+    # the fee line; read with ``.get(..., False)`` against an older bank.
+    own_account_transfer: bool
 
 
 class _PaymentRailFailedPayloadRequired(TypedDict):
@@ -387,6 +397,11 @@ class PaymentRailFailedPayload(_PaymentRailFailedPayloadRequired, total=False):
     # 0.3.22 (fee grid v2): which pricing segment and which rail paid for the send.
     segment: FeeSegment
     funding_rail: FundingRail
+    # Bank B-113 (0.3.52): the credited account is the payer's own (a top-up from
+    # a linked account to the vIBAN, a send to their own linked account); False
+    # for a send to anyone else. Added at fan-out to every payment.* event, like
+    # the fee line; read with ``.get(..., False)`` against an older bank.
+    own_account_transfer: bool
 
 
 class _PaymentBankStatusPayloadRequired(TypedDict):
@@ -441,6 +456,11 @@ class PaymentBankStatusPayload(_PaymentBankStatusPayloadRequired, total=False):
     # 0.3.22 (fee grid v2): which pricing segment and which rail paid for the send.
     segment: FeeSegment
     funding_rail: FundingRail
+    # Bank B-113 (0.3.52): the credited account is the payer's own (a top-up from
+    # a linked account to the vIBAN, a send to their own linked account); False
+    # for a send to anyone else. Added at fan-out to every payment.* event, like
+    # the fee line; read with ``.get(..., False)`` against an older bank.
+    own_account_transfer: bool
 
 
 class _PaymentFeeRefundedPayloadRequired(TypedDict):
@@ -507,6 +527,11 @@ class PaymentReversedPayload(_PaymentReversedPayloadRequired, total=False):
 
     client_reference: str  # ADR-004: only present when the caller supplied one
     deferred_transfer_id: str  # only on a deferred transfer's settle payment
+    # Bank B-113 (0.3.52): the credited account is the payer's own (a top-up from
+    # a linked account to the vIBAN, a send to their own linked account); False
+    # for a send to anyone else. Added at fan-out to every payment.* event, like
+    # the fee line; read with ``.get(..., False)`` against an older bank.
+    own_account_transfer: bool
 
 
 class _AccountLifecyclePayloadRequired(TypedDict):
