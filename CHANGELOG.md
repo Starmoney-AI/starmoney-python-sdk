@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+## [0.3.54] — 2026-11-18
+
+- No SDK change: version lockstep with service 0.3.54 (B-116 is backoffice-only).
+
 ## [0.3.53] — 2026-11-17
 
 - B-114 (service 0.3.53): `PreKycMonthlyCeilingExceededError` (403 `PRE_KYC_MONTHLY_CEILING_EXCEEDED`), exported from `starmoney`; a subclass of `PreKycTotalCeilingExceededError` (same `ceiling_minor` / `consumed_minor` / `pending_minor` / `remaining_minor`) with a typed `resets_on` (ISO date, the 1st of next month, UTC), so existing handlers still catch it. `accounts.get_limits()` items gain `resets_on` (set on the new `pre_kyc_monthly_sends` kind, null elsewhere); an unverified holder under grid v2 sees `pre_kyc_monthly_sends`, the balance and the inbound items, and a verified one `[]`. Additive.
