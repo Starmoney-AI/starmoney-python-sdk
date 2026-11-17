@@ -533,7 +533,8 @@ class AccountsResource:
         While the bank has not verified the holder (``active_pre_kyc`` or
         ``kyc_pending``) the pre-KYC limit grid applies (B-102, 0.3.41: the
         Wave KYC-1 shape, maintained by the bank's ops), all lifted on
-        ``kyc_verified`` with NO reset date (lifetime until verification).
+        ``kyc_verified`` (a verified holder has no limit; the lifetime ones have no
+        reset date, the monthly one carries ``resets_on``).
 
         Each item carries ``kind``, ``direction`` (``"outbound"`` |
         ``"inbound"`` | ``"balance"``), ``period`` (``"per_transaction"`` |
@@ -545,6 +546,12 @@ class AccountsResource:
           - ``pre_kyc_total_sends``   — ceiling on all sends together.
             ``consumed_minor`` = executed, ``pending_minor`` = in flight (counts
             against the ceiling), ``remaining_minor`` = what may still be sent.
+          - ``pre_kyc_monthly_sends`` — (0.3.53, B-114) ceiling on all sends of
+            the current UTC calendar month; the limit an unverified holder is under
+            from grid v2 on (the two above are published at 0 and omitted).
+            ``consumed_minor`` / ``pending_minor`` / ``remaining_minor`` as for
+            ``pre_kyc_total_sends``, over the month; ``resets_on`` is the first day
+            of next month (ISO date, UTC) — null on every other item.
           - ``pre_kyc_balance``       — what the account may HOLD at any time
             (the payee cap: a send that would push the holder past it is refused
             to the SENDER with RECIPIENT_LIMIT_REACHED). ``consumed_minor`` = the

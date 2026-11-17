@@ -36,6 +36,7 @@ from .exceptions import (
     PaymentNotFoundError,
     PhoneCountryNotSupportedError,
     PreKycCeilingExceededError,
+    PreKycMonthlyCeilingExceededError,
     PreKycTotalCeilingExceededError,
     RateLimitError,
     RecipientLimitReachedError,
@@ -167,6 +168,8 @@ class HTTPClient:
             raise BeneficiaryAddLimitReachedError(response.status_code, message, error_data)
         if error_code in ("DUPLICATE_BENEFICIARY", "BENEFICIARY_ACCOUNT_CLOSED"):
             raise DuplicateResourceError(response.status_code, message, error_data)
+        if error_code == "PRE_KYC_MONTHLY_CEILING_EXCEEDED":
+            raise PreKycMonthlyCeilingExceededError(response.status_code, message, error_data)
         if error_code == "PRE_KYC_TOTAL_CEILING_EXCEEDED":
             raise PreKycTotalCeilingExceededError(response.status_code, message, error_data)
         if error_code == "RECIPIENT_LIMIT_REACHED":
