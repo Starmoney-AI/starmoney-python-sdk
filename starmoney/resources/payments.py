@@ -147,6 +147,10 @@ class PaymentsResource:
             PreKycCeilingExceededError (403): over the per-send pre-KYC ceiling.
             PreKycTotalCeilingExceededError (403): over the cumulative pre-KYC
                 send ceiling; carries ceiling / consumed / pending / remaining.
+            PreKycMonthlyCeilingExceededError (403, 0.3.53 B-114): over the
+                calendar-month send ceiling of an unverified holder (a subclass
+                of the one above, same figures plus ``resets_on``, the 1st of
+                next month in UTC). A verified holder has no limit.
             RecipientLimitReachedError (403 RECIPIENT_LIMIT_REACHED, B-102): the
                 RECIPIENT's unverified account cannot hold this amount; no
                 figure is given, the payee is told to verify. Nothing written.

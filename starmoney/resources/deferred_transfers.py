@@ -410,12 +410,18 @@ class DeferredTransfersResource:
         response = await self.http.get("/deferred-transfers", user_id=user_id, params=params)
         return response.json()
 
-    async def get(self, deferred_transfer_id: str) -> dict[str, Any]:
+    async def get(self, deferred_transfer_id: str, user_id: Optional[str] = None) -> dict[str, Any]:
         """
         Read current status of a deferred transfer by its UUID.
 
+        Owner-scoped (B-115): only the sender, or the recipient once they have
+        claimed it, reads the row; anyone else gets 404 like an unknown id. The
+        sender gets the full ``recipient_handle`` — e.g. to resend to the same
+        number without the caller keeping its own copy.
+
         Args:
             deferred_transfer_id: UUID of the deferred transfer.
+            user_id: The caller's user (the sender, or the recipient who claimed).
 
         Returns:
             DeferredTransferResponse dict, with ``funding_source``,
@@ -423,9 +429,11 @@ class DeferredTransfersResource:
             (:class:`DeferredTransferRead`).
 
         Raises:
-            PaymentNotFoundError (404): Transfer not found.
+            PaymentNotFoundError (404): Transfer not found, or not the caller's.
         """
-        response = await self.http.get(f"/deferred-transfers/{deferred_transfer_id}")
+        response = await self.http.get(
+            f"/deferred-transfers/{deferred_transfer_id}", user_id=user_id
+        )
         return response.json()
 
     async def claim(
