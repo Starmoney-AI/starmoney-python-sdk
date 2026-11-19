@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+## [0.3.55] — 2026-11-19
+
+- B-117: the deferred quote carries `claim_by`. `build_deferred_cart_v02` / `send_with_mandates`: `hold_days` is now optional; with neither `execute_before` nor `hold_days`, a cart against a quote with `claim_by` signs no `execute_before` (the deadline is the quote's). Against an older quote it still defaults to 7 days. `DeferredTransferSentPayload` gains `expires_at`.
+
 ## [0.3.54] — 2026-11-18
 
 - No SDK change: version lockstep with service 0.3.54 (B-116 is backoffice-only).
