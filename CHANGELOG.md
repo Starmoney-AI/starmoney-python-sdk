@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+## [0.3.56] — 2026-11-19
+
+- B-118: `RecipientLimitReachedError.recipient_status` (`"no_account"` or `None`) and `.ceiling_minor` (the published cap, only for a number with no account yet).
+
 ## [0.3.55] — 2026-11-19
 
 - B-117: the deferred quote carries `claim_by`. `build_deferred_cart_v02` / `send_with_mandates`: `hold_days` is now optional; with neither `execute_before` nor `hold_days`, a cart against a quote with `claim_by` signs no `execute_before` (the deadline is the quote's). Against an older quote it still defaults to 7 days. `DeferredTransferSentPayload` gains `expires_at`.
