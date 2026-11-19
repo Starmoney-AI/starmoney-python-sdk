@@ -2,10 +2,30 @@
 
 ## [Unreleased]
 
+## [0.3.54] — 2026-11-18
+
+- No SDK change: version lockstep with service 0.3.54 (B-116 is backoffice-only).
+
+## [0.3.53] — 2026-11-17
+
 - B-114 (service 0.3.53): `PreKycMonthlyCeilingExceededError` (403 `PRE_KYC_MONTHLY_CEILING_EXCEEDED`), exported from `starmoney`; a subclass of `PreKycTotalCeilingExceededError` (same `ceiling_minor` / `consumed_minor` / `pending_minor` / `remaining_minor`) with a typed `resets_on` (ISO date, the 1st of next month, UTC), so existing handlers still catch it. `accounts.get_limits()` items gain `resets_on` (set on the new `pre_kyc_monthly_sends` kind, null elsewhere); an unverified holder under grid v2 sees `pre_kyc_monthly_sends`, the balance and the inbound items, and a verified one `[]`. Additive.
 - B-115 (service 0.3.53): `deferred_transfers.get(id, user_id=None)` — pass the sender (or the recipient who claimed) to read the transfer; the sender gets the full `recipient_handle`. Anyone else now gets `404` (`PaymentNotFoundError`), like an unknown id.
+
+## [0.3.52] — 2026-11-16
+
 - B-113 (service 0.3.52): `own_account_transfer: bool` on `PaymentReceivedPayload` (required: the payer is the holder credited, e.g. a top-up), on `PaymentInitiatedPayload`, `PaymentRailFailedPayload`, `PaymentBankStatusPayload` and `PaymentReversedPayload` (the credited account is the payer's own), and on `TransferHistoryRow` (both directions). Read with `.get("own_account_transfer", False)` against a bank older than 0.3.52. Additive.
+
+## [0.3.51] — 2026-11-15
+
 - B-112 (service 0.3.51): several named linked accounts; the customer picks which pays. `accounts.link_rail(..., nickname=)` (1–40 characters, seen only by the holder; on `already_linked` it renames); a different IBAN at a bank already linked is now a new link. New `accounts.links(user_id)` (`{links, max_links}`, linking order, the first is the default), `accounts.rename_link(user_id, link_id, nickname)` (None clears), `accounts.unlink_link(user_id, link_id)`, `accounts.get_linked_balance(..., link_id=)`, `payments.quote(..., funding_link_id=)`. New typed errors `LinkLimitReachedError` (409 `LINK_LIMIT_REACHED`, `limit`), `LinkNotFoundError` (404 `LINK_NOT_FOUND`, `link_id`), `LinkIdRequiredError` (409 `LINK_ID_REQUIRED`, `rail_name`, from `unlink_rail` / `set_rail_account_reference` when several accounts are linked on the rail). `InstitutionAlreadyLinkedError` is kept for imports but the service no longer raises it. `HTTPClient.patch` added. Additive.
+
+## [0.3.50] — 2026-11-15
+
+No SDK change; lockstep with service 0.3.50 (B-111: a BDK link verifies the holder, service-side; `account.kyc.verified` arrives as before).
+
+## [0.3.49] — 2026-11-14
+
+No SDK change; lockstep with service 0.3.49 (B-109 top-up). A top-up is `payments.quote(..., beneficiary_type="iban", beneficiary_value=<own vIBAN>, funding_rail="bdk")`, available since 0.3.48.
 
 ## [0.3.48] — 2026-11-14
 
