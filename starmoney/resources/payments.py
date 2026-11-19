@@ -271,7 +271,9 @@ class PaymentsResource:
                 SELF_TRANSFER_NOT_ALLOWED / BENEFICIARY_TYPE_UNSUPPORTED;
             422 RECIPIENT_HAS_NO_ACCOUNT — the number has no creditable
                 account; the body carries ``recipient_status`` and
-                ``deferred_quote`` for ``POST /v1/deferred-transfers``;
+                ``deferred_quote`` for ``POST /v1/deferred-transfers``, which
+                carries ``claim_by`` (B-117, 0.3.55: ISO 8601 UTC, the instant
+                the recipient must have claimed by);
             404 BENEFICIARY_NOT_FOUND; 409 RECIPIENT_NOT_CREDITABLE /
                 BENEFICIARY_ACCOUNT_CLOSED; 429 IDENTIFIER_LOOKUP_LIMIT_REACHED
                 (``retry_after_seconds``); 403 PRE_KYC_*_CEILING_EXCEEDED;

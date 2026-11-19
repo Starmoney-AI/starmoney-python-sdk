@@ -18,7 +18,8 @@ class RecipientCheck(TypedDict):
     # True when the number is the caller's own. A send to yourself is refused
     # (SelfTransferNotAllowedError), so ``creditable`` is False whenever this is True.
     self: bool
-    # ISO 8601 UTC: the latest ``execute_before`` a deferred transfer signed now may carry.
+    # ISO 8601 UTC: the latest ``execute_before`` a deferred transfer signed now may carry
+    # (now + the bank's claim window, 7 days unless the bank sets less; B-117).
     execute_before_max: str
 
 

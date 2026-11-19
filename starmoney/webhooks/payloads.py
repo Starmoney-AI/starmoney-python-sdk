@@ -126,6 +126,10 @@ class _DeferredTransferSentPayloadRequired(TypedDict):
     # wire; the wording given on the deferred send, None when none. Read with
     # ``.get()`` against a bank older than B-54.
     description: Optional[str]
+    # Bank B-117: the instant the recipient must have claimed by (ISO-8601 UTC,
+    # e.g. "2026-11-19T10:15:00Z"); None for a transfer without a deadline. Always
+    # present from bank 0.3.55: read with ``.get()`` against an older bank.
+    expires_at: Optional[str]
     metadata: WebhookMetadata
 
 

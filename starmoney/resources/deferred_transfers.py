@@ -254,7 +254,7 @@ class DeferredTransfersResource:
         consent_token: dict[str, Any],
         currency: Literal["XOF"] = "XOF",
         execute_before: Optional[str] = None,
-        hold_days: int = 7,
+        hold_days: Optional[int] = None,
         description: Optional[str] = None,
         client_reference: Optional[str] = None,
         intent_ttl_minutes: int = 15,
@@ -286,8 +286,12 @@ class DeferredTransfersResource:
                 ``deferred_quote``). Raise locally when it carries none.
             beneficiary_value: The phone the customer typed (E.164).
             amount_minor: The amount quoted.
-            execute_before / hold_days: The execution window; default 7 days
-                from the tap. See :meth:`UP3Resource.build_deferred_cart_v02`.
+            execute_before / hold_days: Optional since bank 0.3.55 (B-117): when
+                the deferred quote carries ``claim_by`` and neither is given, the
+                cart names no window and the quote's ``claim_by`` is the deadline;
+                pass one only to ask for an earlier deadline. Against a bank
+                without ``claim_by``: 7 days from the tap, as before. See
+                :meth:`UP3Resource.build_deferred_cart_v02`.
             description: The sender's wording (max 30 characters, e.g. ``"loyer"``).
                 Sent in the request body (the signed cart carries no wording) and
                 also used as the intent's human echo, as in ``payments.send_with_mandates``;

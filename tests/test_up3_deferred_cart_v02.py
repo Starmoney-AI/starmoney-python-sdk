@@ -166,6 +166,48 @@ def test_deferred_cart_default_window_is_hold_days_after_the_tap_and_capped_at_s
             )
 
 
+def test_b117_a_quote_with_claim_by_gives_a_cart_with_no_execute_before():
+    """Bank 0.3.55: the deadline travels in the signed quote; the cart names none."""
+    resource = _resource()
+    intent = _intent(resource)
+    refusal = _refusal(claim_by="2026-10-31T12:15:00Z")
+    cart = resource.build_deferred_cart_v02(
+        intent, refusal=refusal, beneficiary_value=PHONE, amount_minor=20_000,
+        confirmed_at="2026-10-31T12:00:00Z", consent_evidence=pin_evidence("2026-10-31T12:00:00Z"),
+    )
+    assert "execute_before" not in cart["payload"]
+    assert verify(cart, secret=SECRET) is True
+    jsonschema = pytest.importorskip("jsonschema")
+    jsonschema.validate(cart, json.loads(_SCHEMA.read_text()))
+
+
+def test_b117_an_explicit_window_or_hold_days_is_still_signed_when_the_quote_has_claim_by():
+    resource = _resource()
+    intent = _intent(resource)
+    refusal = _refusal(claim_by="2026-10-31T12:15:00Z")
+    confirmed_at = "2026-10-31T12:00:00Z"
+    evidence = pin_evidence(confirmed_at)
+    explicit = resource.build_deferred_cart_v02(
+        intent, refusal=refusal, beneficiary_value=PHONE, amount_minor=20_000,
+        confirmed_at=confirmed_at, execute_before="2026-10-31T12:10:00Z", consent_evidence=evidence,
+    )
+    assert explicit["payload"]["execute_before"] == "2026-10-31T12:10:00Z"
+    days = resource.build_deferred_cart_v02(
+        intent, refusal=refusal, beneficiary_value=PHONE, amount_minor=20_000,
+        confirmed_at=confirmed_at, hold_days=1, consent_evidence=evidence,
+    )
+    assert days["payload"]["execute_before"] == "2026-11-01T12:00:00Z"
+
+
+def test_b117_a_quote_without_claim_by_keeps_the_seven_day_default():
+    resource = _resource()
+    cart = resource.build_deferred_cart_v02(
+        _intent(resource), refusal=_refusal(), beneficiary_value=PHONE, amount_minor=20_000,
+        confirmed_at="2026-10-31T12:00:00Z", consent_evidence=pin_evidence("2026-10-31T12:00:00Z"),
+    )
+    assert cart["payload"]["execute_before"] == "2026-11-07T12:00:00Z"
+
+
 def test_deferred_cart_normalises_an_explicit_window_to_the_envelope_z_form():
     resource = _resource()
     cart = resource.build_deferred_cart_v02(

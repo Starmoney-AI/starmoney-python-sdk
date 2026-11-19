@@ -493,7 +493,7 @@ class UP3Resource:
         consent_evidence: dict[str, Any],
         currency: str = "XOF",
         execute_before: Optional[str] = None,
-        hold_days: int = 7,
+        hold_days: Optional[int] = None,
         confirmed_at: Optional[str] = None,
         ttl_minutes: int = 2,
         idempotency_seed: Optional[str] = None,
@@ -514,6 +514,16 @@ class UP3Resource:
         may still execute the consented transfer — the hold runs until then
         (at most the bank's 7-day ceiling) and lapses unclaimed after it.
 
+        Since bank 0.3.55 (B-117) the deferred quote carries ``claim_by``, the
+        instant the recipient must have claimed by (the bank's claim window,
+        set in its backoffice). When the quote has one and you pass neither
+        ``execute_before`` nor ``hold_days``, the cart carries **no**
+        ``execute_before``: the deadline the customer consents to is the
+        quote's ``claim_by``, signed through the quote digest. Pass
+        ``execute_before`` / ``hold_days`` only to ask for an EARLIER deadline
+        (the bank applies the earlier of the two). Against a bank without
+        ``claim_by`` the window defaults to 7 days from the tap, as before.
+
         Args:
             intent_mandate: The signed IntentMandate from :meth:`build_intent`
                 (``max_amount_minor`` must cover ``amount_minor``).
@@ -528,9 +538,12 @@ class UP3Resource:
             amount_minor: The amount quoted (the refusal does not repeat it).
             currency: ``XOF``.
             execute_before: RFC 3339 Z timestamp — the end of the execution
-                window. Defaults to ``confirmed_at + hold_days`` days.
-            hold_days: Default window length when ``execute_before`` is not
-                given (1–7; the bank caps the hold at 7 days).
+                window. Optional when the quote carries ``claim_by`` (then
+                omitted from the cart unless given); else defaults to
+                ``confirmed_at + hold_days`` days.
+            hold_days: Window length when ``execute_before`` is not given
+                (1–7; the bank caps the hold at 7 days). Default: omit the
+                window when the quote has ``claim_by``, else 7 days.
             confirmed_at: RFC 3339 Z timestamp of the user's tap. Defaults to now.
             consent_evidence: ``user_consent_evidence``, REQUIRED (P19): the
                 customer-present proof, ``chat_session_pin_v1`` today, a fresh
@@ -553,7 +566,8 @@ class UP3Resource:
 
         Returns:
             Signed ``version: "0.2"`` CartMandate envelope with
-            ``payload.execute_before``, ready to POST as ``cart_mandate`` on
+            ``payload.execute_before`` (absent when the quote's ``claim_by`` is
+            the deadline), ready to POST as ``cart_mandate`` on
             ``POST /v1/deferred-transfers/send`` with no instruction fields.
 
         Raises:
@@ -580,13 +594,16 @@ class UP3Resource:
         amount_minor = int(amount_minor)
         if amount_minor <= 0:
             raise ValueError("amount_minor must be > 0")
-        if not 1 <= int(hold_days) <= 7:
+        if hold_days is not None and not 1 <= int(hold_days) <= 7:
             raise ValueError("hold_days must be between 1 and 7 (the bank caps the hold at 7 days)")
         if confirmed_at is None:
             confirmed_at = _now_z()
         if execute_before is None:
-            anchor = datetime.strptime(confirmed_at, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=timezone.utc)
-            execute_before = (anchor + timedelta(days=int(hold_days))).strftime("%Y-%m-%dT%H:%M:%SZ")
+            if hold_days is None and dq.get("claim_by"):
+                pass  # B-117: the quote's claim_by is the deadline; the cart names none
+            else:
+                anchor = datetime.strptime(confirmed_at, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=timezone.utc)
+                execute_before = (anchor + timedelta(days=int(hold_days or 7))).strftime("%Y-%m-%dT%H:%M:%SZ")
         else:
             execute_before = _to_z(execute_before)
 
@@ -608,10 +625,11 @@ class UP3Resource:
             "beneficiary_name": None,  # nobody holds the number yet: no name was shown
             "quote": {"id": quote_id, "digest": digest, "digest_alg": digest_alg},
             "fees_minor": fees_minor,
-            "execute_before": execute_before,
             "confirmed_at": confirmed_at,
             "user_consent_evidence": consent_evidence,
         }
+        if execute_before is not None:
+            payload["execute_before"] = execute_before
         if execution_mode is not None:
             payload["execution_mode"] = execution_mode
         envelope: dict[str, Any] = {
