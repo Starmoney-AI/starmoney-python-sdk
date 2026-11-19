@@ -159,13 +159,24 @@ class RecipientLimitReachedError(APIError):
     hold (``error_code == "RECIPIENT_LIMIT_REACHED"``, B-102).
 
     The send would push the payee's balance past the pre-KYC balance cap, so the
-    bank refused it before anything was held or parked. The payload carries NO
-    figure (the payee's balance and headroom are theirs); the fixed message is the
-    whole answer. Lifted when the payee is verified. Raised by ``payments.quote``,
-    ``payments.send`` and ``deferred_transfers.send``.
+    bank refused it before anything was held or parked. For a payee who has an
+    account the payload carries NO figure (their balance and headroom are theirs);
+    the fixed message is the whole answer. Lifted when the payee is verified.
+    Raised by ``payments.quote``, ``payments.send`` and ``deferred_transfers.send``.
+
+    B-118: when the number has no account yet, ``recipient_status`` is
+    ``"no_account"`` and ``ceiling_minor`` is the published cap, so the caller can
+    say «a new customer cannot receive more than 200 000 F until they open and
+    verify their account». Both are ``None`` otherwise.
     """
 
-    pass
+    @property
+    def recipient_status(self) -> Optional[str]:
+        return self.response_data.get("recipient_status")
+
+    @property
+    def ceiling_minor(self) -> Optional[int]:
+        return self.response_data.get("ceiling_minor")
 
 
 class PreKycTotalCeilingExceededError(APIError):

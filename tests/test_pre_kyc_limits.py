@@ -127,3 +127,41 @@ async def test_payment_to_a_mistyped_iban_fails_before_the_request():
             client_transaction_id="ctid-1",
         )
     http.post.assert_not_awaited()
+
+
+def test_recipient_with_no_account_refusal_carries_the_published_cap():
+    """B-118 (0.3.56): Awa sends 250 000 F to Sandrine, who has no account yet."""
+    from starmoney import RecipientLimitReachedError
+
+    with pytest.raises(RecipientLimitReachedError) as err:
+        _handle(
+            _error(
+                403,
+                {
+                    "error_code": "RECIPIENT_LIMIT_REACHED",
+                    "detail": "the recipient has no account yet: a new customer cannot receive "
+                    "more than the limit until they open and verify their account",
+                    "recipient_status": "no_account",
+                    "ceiling_minor": 200000,
+                    "currency": "XOF",
+                    "lifts_on": "kyc_verified",
+                },
+            )
+        )
+    assert (err.value.recipient_status, err.value.ceiling_minor) == ("no_account", 200000)
+
+
+def test_recipient_with_an_account_refusal_carries_no_figure():
+    from starmoney import RecipientLimitReachedError
+
+    with pytest.raises(RecipientLimitReachedError) as err:
+        _handle(
+            _error(
+                403,
+                {
+                    "error_code": "RECIPIENT_LIMIT_REACHED",
+                    "detail": "the recipient has reached the limit of their account",
+                },
+            )
+        )
+    assert (err.value.recipient_status, err.value.ceiling_minor) == (None, None)
