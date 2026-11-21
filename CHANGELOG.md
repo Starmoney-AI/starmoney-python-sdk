@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+## [0.3.62] — 2026-11-21
+
+- No SDK change (lockstep with service 0.3.62: secrets scrubbing of error reports).
+
 ## [0.3.61] — 2026-11-21
 
 - No SDK change (lockstep with service 0.3.61: money fix + backoffice feed). A balance read while BDK is unreachable now gets a 503 `BANK_UNAVAILABLE` from the service.
