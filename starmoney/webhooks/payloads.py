@@ -251,7 +251,8 @@ class _DeferredTransferClosedPayloadRequired(TypedDict):
     created_by_service: str
     amount_minor: int
     currency: str
-    # expired: "not_claimed" | "recipient_kyc_incomplete"; cancelled: "cancelled_by_sender"
+    # expired: "not_claimed" | "recipient_kyc_incomplete";
+    # cancelled: "cancelled_by_sender" | "link_unlinked" (W-310)
     reason_code: str
     recipient_handle: str
     recipient_user_id: Optional[str]  # set once the recipient claimed

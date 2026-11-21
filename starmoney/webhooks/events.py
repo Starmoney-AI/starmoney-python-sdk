@@ -89,7 +89,8 @@ class WebhookEvent(str, Enum):
 
     DEFERRED_TRANSFER_CANCELLED = "deferred_transfer.cancelled"
     """The sender cancelled before the claim; the hold was released (money back).
-    ``reason_code``: ``cancelled_by_sender``."""
+    ``reason_code``: ``cancelled_by_sender``, or ``link_unlinked`` (W-310: the sender
+    unlinked the account a pull-funded transfer would have pulled from)."""
 
     DEFERRED_TRANSFER_FAILED = "deferred_transfer.failed"
     """A pull-funded (best-effort) transfer ended ``failed``: BDK refused the pull

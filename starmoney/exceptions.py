@@ -384,6 +384,23 @@ class LinkIdRequiredError(APIError):
         return self.response_data.get("rail_name")
 
 
+class LinkInUseError(APIError):
+    """409 - the account cannot be unlinked yet: a deferred transfer it pays is
+    already being claimed (claimed, parked for the recipient's verification, or
+    settling) (``error_code == "LINK_IN_USE"``, W-310, service 0.3.57). Nothing was
+    unlinked or cancelled. ``deferred_transfer_ids`` lists them; unlink once they
+    have settled. Example: Awa sent 5 000 F from «Épargne» to Sandrine, who is
+    claiming it; ``unlink_link(awa, epargne)`` → this error with that transfer's id."""
+
+    @property
+    def link_id(self) -> Optional[str]:
+        return self.response_data.get("link_id")
+
+    @property
+    def deferred_transfer_ids(self) -> list[str]:
+        return list(self.response_data.get("deferred_transfer_ids") or [])
+
+
 class FundingRailChangedError(APIError):
     """409 - between the preview and the confirm the rail that funds the send changed
     (``error_code == "FUNDING_RAIL_CHANGED"``, 0.3.22). The quote priced a send funded

@@ -184,14 +184,21 @@ class AccountsResource:
         shows ``has_credentials: false`` and the linked balance answers
         ``RAIL_NOT_LINKED``. The holder can link the same IBAN again.
 
+        W-310 (service 0.3.57): the deferred transfers this account would pay
+        that are not yet claimed are cancelled with it (each also sends
+        ``deferred_transfer.cancelled``, ``reason_code`` ``link_unlinked``).
+
         Returns:
-            ``{"rail_name": "bdk", "status": "unlinked"}``
+            ``{"rail_name": "bdk", "status": "unlinked",
+            "cancelled_deferred_transfer_ids": [...]}``
 
         Raises:
             PaymentNotFoundError: the SDK's 404 class — ``RAIL_NOT_LINKED``,
                 nothing is linked on that rail.
             LinkIdRequiredError: 409 (B-112) — several accounts are linked on
                 that rail; use ``unlink_link`` with a ``link_id``.
+            LinkInUseError: 409 (W-310) — a transfer it pays is being claimed;
+                nothing unlinked or cancelled.
 
         Example:
             ```python
@@ -251,11 +258,20 @@ class AccountsResource:
         Unlinking the default makes the next-oldest link the default. The holder
         stays verified (B-111): KYC is a property of the person.
 
+        W-310 (service 0.3.57): in the same step, the deferred transfers this
+        account would pay that are not yet claimed are cancelled (each also sends
+        ``deferred_transfer.cancelled``, ``reason_code`` ``link_unlinked``) and
+        listed in ``cancelled_deferred_transfer_ids``; a top-up already sent never
+        blocks. Warn the holder before calling this.
+
         Returns:
-            ``{"link_id": ..., "rail_name": "bdk", "status": "unlinked"}``
+            ``{"link_id": ..., "rail_name": "bdk", "status": "unlinked",
+            "cancelled_deferred_transfer_ids": [...]}``
 
         Raises:
             LinkNotFoundError: 404 — not one of the holder's active links.
+            LinkInUseError: 409 (W-310) — a transfer it pays is already being
+                claimed (``deferred_transfer_ids``); nothing unlinked or cancelled.
         """
         response = await self.http.delete(f"/accounts/links/{link_id}", user_id=user_id)
         return response.json()

@@ -67,6 +67,7 @@ from .exceptions import (  # UP3 typed exceptions
     LinkedAccountRejectedError,
     InstitutionAlreadyLinkedError,
     LinkIdRequiredError,
+    LinkInUseError,
     LinkLimitReachedError,
     LinkNotFoundError,
     LinkVerificationFailedError,
@@ -223,6 +224,7 @@ __all__ = [
     "LinkLimitReachedError",
     "LinkNotFoundError",
     "LinkIdRequiredError",
+    "LinkInUseError",
     "FundingRailChangedError",
     "InvalidSignatureError",
     # UP3 exceptions

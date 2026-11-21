@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- W-310: `LinkInUseError` (409 `LINK_IN_USE`, exported from `starmoney`) with `link_id` and `deferred_transfer_ids`, raised by `accounts.unlink_link` / `unlink_rail` when a deferred transfer the account pays is being claimed. Both calls' answers gain `cancelled_deferred_transfer_ids`. `deferred_transfer.cancelled` may carry `reason_code` `link_unlinked`. Additive.
+
 ## [0.3.56] — 2026-11-19
 
 - B-118: `RecipientLimitReachedError.recipient_status` (`"no_account"` or `None`) and `.ceiling_minor` (the published cap, only for a number with no account yet).
