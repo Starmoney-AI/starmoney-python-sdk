@@ -12,6 +12,7 @@ from .resources.accounts import AccountsResource
 from .resources.beneficiaries import BeneficiariesResource
 from .resources.beneficiary_requests import BeneficiaryRequestsResource
 from .resources.deferred_transfers import DeferredTransfersResource
+from .resources.health import HealthResource
 from .resources.payments import PaymentsResource
 from .resources.recipients import RecipientsResource
 from .resources.webhooks import WebhooksResource
@@ -121,6 +122,7 @@ class StarmoneyClient:
         self._beneficiary_requests: Optional[BeneficiaryRequestsResource] = None
         self._recipients: Optional[RecipientsResource] = None
         self._webhooks: Optional[WebhooksResource] = None
+        self._health: Optional[HealthResource] = None
 
     @property
     def accounts(self) -> AccountsResource:
@@ -167,6 +169,13 @@ class StarmoneyClient:
             # Wire UP3 resource so send_with_mandates works (PR-D).
             self._deferred_transfers._up3 = self._up3_resource
         return self._deferred_transfers
+
+    @property
+    def health(self) -> HealthResource:
+        """Bank health: ``client.health.deep()`` (unauthenticated, 0.3.59)."""
+        if self._health is None:
+            self._health = HealthResource(self._http_client)
+        return self._health
 
     @property
     def webhooks(self) -> WebhooksResource:

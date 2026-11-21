@@ -106,6 +106,7 @@ from .exceptions import (  # UP3 typed exceptions
     ValidationError,
 )
 from .resources.payments import CartAbandonment, StoredMandates
+from .resources.health import ComponentHealth, DeepHealth
 from .resources.recipients import RecipientCheck
 from .statuses import (
     AccountState,
@@ -189,6 +190,8 @@ __all__ = [
     "FeeSegment",
     "FundingRail",
     "RecipientCheck",
+    "DeepHealth",
+    "ComponentHealth",
     "CartAbandonment",
     "StoredMandates",
     "FundsOutcome",

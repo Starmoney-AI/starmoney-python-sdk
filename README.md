@@ -245,6 +245,17 @@ with starmoney.correlation_id("turn-123"):   # works inside async code
 
 It is a `contextvars.ContextVar`, so concurrent asyncio tasks keep separate ids; blocks nest (inner wins, outer restored on exit). A header passed explicitly on a call still wins. The id must be 1-128 characters from `[A-Za-z0-9._:-]`, else `ValueError`.
 
+### Bank health
+
+```python
+health = await client.health.deep()   # 200 and 503 both return the body
+if health["status"] == "down":
+    down = {n: c["error_code"] for n, c in health["components"].items() if c["status"] == "down"}
+    # e.g. {"bdk": "timeout"}: sends and the linked balance are paused
+```
+
+Unauthenticated, cached 15 s by the bank; components `database`, `cache`, `viban_ledgers`, `bdk`, `worker`. Contract: the bank's docs/HEALTH.md.
+
 ### Error Handling
 
 ```python

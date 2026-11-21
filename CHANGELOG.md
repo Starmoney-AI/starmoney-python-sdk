@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+## [0.3.59] — 2026-11-21
+
+- `client.health.deep()`: the bank's deep health (`GET /health/deep`), typed `DeepHealth` / `ComponentHealth`, exported from `starmoney`. It returns the body on 200 (up) and on 503 (down) without raising, and sends no auth header. Components: `database`, `cache`, `viban_ledgers`, `bdk`, `worker`. Additive.
+
 ## [0.3.58] — 2026-11-21
 
 - `starmoney.correlation_id("turn-123")`: a context manager that sends one `X-Correlation-ID` on every request made inside the block (a `ContextVar`, so concurrent asyncio tasks never mix ids; nestable). An explicit `X-Correlation-ID` header still wins; with nothing set the SDK mints a uuid4 per request as before. Additive.
