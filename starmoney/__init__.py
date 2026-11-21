@@ -51,6 +51,7 @@ Webhook Validation:
 """
 
 from .client import StarmoneyClient
+from .correlation import correlation_id
 from .exceptions import (  # UP3 typed exceptions
     AccountNotPayableError,
     APIError,
@@ -165,6 +166,7 @@ __all__ = [
     "AccountType",
     "DeferredTransferStatus",
     "StarmoneyClient",
+    "correlation_id",
     "WebhookValidator",
     "WebhookEvent",
     "DeferredTransferSentPayload",

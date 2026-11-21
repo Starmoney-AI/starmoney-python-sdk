@@ -231,6 +231,20 @@ payment2 = await client.payments.send(
 )
 ```
 
+### Correlation id per turn
+
+Every request carries an `X-Correlation-ID` (the bank logs it as `corr`). By default the SDK mints a fresh uuid4 per request. To make one unit of work (say, one chat turn) show as one trace, set the id once:
+
+```python
+import starmoney
+
+with starmoney.correlation_id("turn-123"):   # works inside async code
+    await client.accounts.get_status(user_id)  # all calls in the block send turn-123
+    await client.accounts.get_balance(user_id)
+```
+
+It is a `contextvars.ContextVar`, so concurrent asyncio tasks keep separate ids; blocks nest (inner wins, outer restored on exit). A header passed explicitly on a call still wins. The id must be 1-128 characters from `[A-Za-z0-9._:-]`, else `ValueError`.
+
 ### Error Handling
 
 ```python

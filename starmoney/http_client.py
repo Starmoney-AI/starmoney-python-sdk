@@ -12,6 +12,7 @@ from typing import Any, Optional
 import httpx
 
 from .auth import AuthManager
+from .correlation import get_correlation_id
 from .exceptions import (
     UP3_ERROR_CODE_MAP,
     AccountNotPayableError,
@@ -120,9 +121,11 @@ class HTTPClient:
         auth_header = self.auth.get_auth_header(user_id)
         final_headers.update(auth_header)
 
-        # Add correlation ID for request tracing
-        if "X-Correlation-ID" not in final_headers:
-            final_headers["X-Correlation-ID"] = str(uuid.uuid4())
+        # Correlation ID for request tracing. Order: an explicit header from the
+        # caller, else the per-turn id set with `starmoney.correlation_id(...)`,
+        # else a fresh uuid4.
+        if not any(k.lower() == "x-correlation-id" for k in final_headers):
+            final_headers["X-Correlation-ID"] = get_correlation_id() or str(uuid.uuid4())
 
         return final_headers
 
