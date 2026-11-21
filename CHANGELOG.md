@@ -2,7 +2,12 @@
 
 ## [Unreleased]
 
+## [0.3.58] — 2026-11-21
+
 - `starmoney.correlation_id("turn-123")`: a context manager that sends one `X-Correlation-ID` on every request made inside the block (a `ContextVar`, so concurrent asyncio tasks never mix ids; nestable). An explicit `X-Correlation-ID` header still wins; with nothing set the SDK mints a uuid4 per request as before. Additive.
+
+## [0.3.57] — 2026-11-21
+
 - W-310: `LinkInUseError` (409 `LINK_IN_USE`, exported from `starmoney`) with `link_id` and `deferred_transfer_ids`, raised by `accounts.unlink_link` / `unlink_rail` when a deferred transfer the account pays is being claimed. Both calls' answers gain `cancelled_deferred_transfer_ids`. `deferred_transfer.cancelled` may carry `reason_code` `link_unlinked`. Additive.
 
 ## [0.3.56] — 2026-11-19
