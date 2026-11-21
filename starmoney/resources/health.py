@@ -37,12 +37,6 @@ class DeepHealth(TypedDict):
     components: Dict[str, ComponentHealth]
 
 
-class DeepHealthForced(DeepHealth, total=False):
-    """Stage only: ``forced`` is ``True`` during an operator's forced-down drill."""
-
-    forced: bool
-
-
 def _root_url(base_url: str) -> str:
     """The health routes sit at the service root, not under ``/v1``."""
     base = base_url.rstrip("/")
@@ -55,7 +49,7 @@ class HealthResource:
     def __init__(self, http_client: HTTPClient):
         self.http = http_client
 
-    async def deep(self) -> DeepHealthForced:
+    async def deep(self) -> DeepHealth:
         """``GET /health/deep``: the body on 200 and on 503 alike.
 
         Raises ``httpx.HTTPError`` only when the bank cannot be reached or
