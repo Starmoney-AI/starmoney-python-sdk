@@ -78,3 +78,15 @@ def test_fee_line_and_payment_payloads_carry_debits_and_fee_source(typed):
 def test_transfer_history_rows_carry_debits_and_fee_source():
     hints = get_type_hints(TransferHistoryRow, globalns=vars(transfer_history))
     assert {"debits", "fee_source"} <= set(hints)
+
+
+def test_deferred_transfer_surfaces_carry_debits_and_fee_source():
+    """A transfer scheduled from a linked account has StarMoney's fee taken from the sender's
+    StarMoney vIBAN when it executes: the read, the list row and deferred_transfer.sent show it."""
+    from starmoney.resources import deferred_transfers
+
+    for typed in (deferred_transfers.DeferredTransferListItem, deferred_transfers.DeferredTransferRead):
+        hints = get_type_hints(typed, globalns=vars(deferred_transfers))
+        assert {"debits", "fee_source"} <= set(hints)
+    hints = get_type_hints(payloads.DeferredTransferSentPayload, globalns=vars(payloads))
+    assert {"debits", "fee_source"} <= set(hints)

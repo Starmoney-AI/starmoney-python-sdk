@@ -179,6 +179,13 @@ class _DeferredTransferSentPayloadRequired(TypedDict):
     # e.g. "2026-11-19T10:15:00Z"); None for a transfer without a deadline. Always
     # present from bank 0.3.55: read with ``.get()`` against an older bank.
     expires_at: Optional[str]
+    # Fee-from-StarMoney (0.4.0): what leaves each account with this transfer, and
+    # where StarMoney's fee is taken from (a transfer funded from a linked account
+    # has it taken from the sender's StarMoney vIBAN when it executes). ``None`` on a
+    # transfer sent without a quote. Always present from bank 0.4.0: read with
+    # ``.get()`` against an older bank.
+    debits: Optional[list[Debit]]
+    fee_source: Optional[FeeSource]
     metadata: WebhookMetadata
 
 
