@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from typing import Literal, Optional, TypedDict
 
-from starmoney.webhooks.payloads import Debit, FeeSource  # noqa: E402
+from .webhooks.payloads import Debit, FeeSource
 
 TransferDirection = Literal["in", "out"]
 
