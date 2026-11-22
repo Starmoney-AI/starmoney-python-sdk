@@ -73,9 +73,9 @@ class TransferHistoryRow(_TransferHistoryRowBase, total=False):
     # send that confirmed no quote. ``total_debit_minor`` is what left the paying account.
     segment: Optional[Literal["p2p", "b2c", "b2b", "marketplace"]]
     funding_rail: Optional[Literal["viban", "bdk"]]
-    # Fee-from-StarMoney (0.4.0), additive: the per-account breakdown (``debits[]``,
+    # Fee-from-StarMoney (0.3.63), additive: the per-account breakdown (``debits[]``,
     # one row per payment: the fee is a line on it, never a row of its own) and
-    # where StarMoney's fee comes from; absent from a bank older than 0.4.0.
+    # where StarMoney's fee comes from; absent from a bank older than 0.3.63.
     debits: Optional[list[Debit]]
     fee_source: Optional[FeeSource]
     # B-78 (absent from a bank older than this field). out: the sender's saved

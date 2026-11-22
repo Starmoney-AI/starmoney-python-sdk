@@ -32,7 +32,7 @@ class _DeferredTransferAccountFields(TypedDict):
     # B-54: the sender's own wording for the send (max 30 characters); null when
     # none. Always sent; read with ``.get()`` against a bank older than this field.
     description: Optional[str]
-    # Fee-from-StarMoney (0.4.0): what leaves each account, line by line, and where
+    # Fee-from-StarMoney (0.3.64): what leaves each account, line by line, and where
     # StarMoney's fee is taken from (``"starmoney"`` = the sender's StarMoney vIBAN,
     # when the transfer executes; ``"paying_account"`` otherwise). Null on a transfer
     # sent without a quote. The bank computes every line; never compute them. Read

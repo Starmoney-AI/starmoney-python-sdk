@@ -33,7 +33,7 @@ FeeSegment = Literal["p2p", "b2c", "b2b", "marketplace"]
 FundingRail = Literal["viban", "bdk"]
 
 
-# Fee-from-StarMoney (0.4.0): one entry of ``debits[]`` per account that is debited
+# Fee-from-StarMoney (0.3.63): one entry of ``debits[]`` per account that is debited
 # for a send, and the lines that make up that account's total. The bank computes
 # every figure from the grid; a consumer renders ``debits[]`` and never computes.
 DebitAccount = Literal["linked", "starmoney"]
@@ -100,8 +100,8 @@ class FeeLine(TypedDict):
     fee_grid_version: int
     segment: FeeSegment
     funding_rail: FundingRail
-    # Fee-from-StarMoney (0.4.0), additive. The per-account breakdown and where
-    # StarMoney's fee is taken; absent from a bank older than 0.4.0.
+    # Fee-from-StarMoney (0.3.63), additive. The per-account breakdown and where
+    # StarMoney's fee is taken; absent from a bank older than 0.3.63.
     # ``fee_total_minor`` keeps its meaning (the sum of every fee line).
     debits: NotRequired[list[Debit]]
     fee_source: NotRequired[FeeSource]
@@ -133,7 +133,7 @@ PaymentFailureReason = Literal[
     "bank_unreachable",
     "bank_refused_other",
     "technical",
-    # 0.4.0: the send is paid from a linked account and StarMoney's fee is taken
+    # 0.3.63: the send is paid from a linked account and StarMoney's fee is taken
     # from the StarMoney vIBAN, which could not cover it when the send was about to
     # leave. ``funds`` is ``not_debited``; the linked account was never called.
     "fee_funds_insufficient",
@@ -179,10 +179,10 @@ class _DeferredTransferSentPayloadRequired(TypedDict):
     # e.g. "2026-11-19T10:15:00Z"); None for a transfer without a deadline. Always
     # present from bank 0.3.55: read with ``.get()`` against an older bank.
     expires_at: Optional[str]
-    # Fee-from-StarMoney (0.4.0): what leaves each account with this transfer, and
+    # Fee-from-StarMoney (0.3.64): what leaves each account with this transfer, and
     # where StarMoney's fee is taken from (a transfer funded from a linked account
     # has it taken from the sender's StarMoney vIBAN when it executes). ``None`` on a
-    # transfer sent without a quote. Always present from bank 0.4.0: read with
+    # transfer sent without a quote. Always present from bank 0.3.64: read with
     # ``.get()`` against an older bank.
     debits: Optional[list[Debit]]
     fee_source: Optional[FeeSource]
@@ -346,7 +346,7 @@ class DeferredTransferFailedPayload(_DeferredTransferFailedPayloadRequired, tota
     (``funds=not_debited``) arrives separately; this one goes to the sending
     service so it can tell the recipient (``recipient_handle``).
     ``reason_code``: ``bdk_refused`` | ``payment_failed`` | ``fee_funds_insufficient``
-    (0.4.0, additive: the sender's StarMoney account could not cover StarMoney's fee when
+    (0.3.64, additive: the sender's StarMoney account could not cover StarMoney's fee when
     the recipient claimed; the bank was never called).
     """
 
@@ -399,7 +399,7 @@ class PaymentInitiatedPayload(_PaymentInitiatedPayloadRequired, total=False):
     fees_minor: dict[str, int]
     fee_total_minor: int
     total_debit_minor: int
-    # Fee-from-StarMoney (0.4.0), additive: see :class:`FeeLine`.
+    # Fee-from-StarMoney (0.3.63), additive: see :class:`FeeLine`.
     debits: list[Debit]
     fee_source: FeeSource
     fee_grid_version: int
@@ -463,7 +463,7 @@ class PaymentRailFailedPayload(_PaymentRailFailedPayloadRequired, total=False):
     fees_minor: dict[str, int]
     fee_total_minor: int
     total_debit_minor: int
-    # Fee-from-StarMoney (0.4.0), additive: see :class:`FeeLine`.
+    # Fee-from-StarMoney (0.3.63), additive: see :class:`FeeLine`.
     debits: list[Debit]
     fee_source: FeeSource
     fee_grid_version: int
@@ -525,7 +525,7 @@ class PaymentBankStatusPayload(_PaymentBankStatusPayloadRequired, total=False):
     fees_minor: dict[str, int]
     fee_total_minor: int
     total_debit_minor: int
-    # Fee-from-StarMoney (0.4.0), additive: see :class:`FeeLine`.
+    # Fee-from-StarMoney (0.3.63), additive: see :class:`FeeLine`.
     debits: list[Debit]
     fee_source: FeeSource
     fee_grid_version: int

@@ -421,7 +421,7 @@ class FundingRailChangedError(APIError):
 class FeeFundsInsufficientError(APIError):
     """402 - the send is paid from a linked account, StarMoney's fee is taken from
     the customer's StarMoney vIBAN, and that vIBAN cannot cover it
-    (``error_code == "FEE_FUNDS_INSUFFICIENT"``, 0.4.0). Raised by the quote and by
+    (``error_code == "FEE_FUNDS_INSUFFICIENT"``, 0.3.63). Raised by the quote and by
     the confirm; nothing moved. The customer tops up the StarMoney account (or the
     send is refused), then asks again. Distinct from ``INSUFFICIENT_FUNDS``, which
     is the paying account itself."""
