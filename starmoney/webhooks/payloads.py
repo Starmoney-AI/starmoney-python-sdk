@@ -351,6 +351,10 @@ class DeferredTransferFailedPayload(_DeferredTransferFailedPayloadRequired, tota
     """
 
     client_reference: str  # ADR-004: only present when the caller supplied one
+    # Additive: StarMoney's fee (XOF minor units) for this transfer, only when that fee was to
+    # come from the sender's StarMoney vIBAN (the same number as the ``starmoney_fee`` line of
+    # the transfer's ``debits``). Absent otherwise: read with ``.get()``.
+    starmoney_fee_minor: int
 
 
 class _PaymentInitiatedPayloadRequired(TypedDict):

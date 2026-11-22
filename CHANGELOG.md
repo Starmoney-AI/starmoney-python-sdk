@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- `DeferredTransferFailedPayload` gains the optional `starmoney_fee_minor` (int, XOF minor units): StarMoney's fee for the transfer, present only when it was to come from the sender's StarMoney vIBAN, absent otherwise. Read with `.get()`.
+
 ## [0.3.64] — 2026-11-22
 
 - Deferred transfers follow the fee-from-StarMoney rule (additive): `debits` and `fee_source` (null on a transfer sent without a quote) on `DeferredTransferRead`, `DeferredTransferListItem` and `DeferredTransferSentPayload`. The bank computes every line; read with `.get()` against an older bank. `deferred_transfer.failed` `reason_code` gains `fee_funds_insufficient` (the sender's StarMoney account could not cover the fee at the claim; the bank was never called): treat an unknown value as a failure.
