@@ -418,6 +418,27 @@ class FundingRailChangedError(APIError):
         return self.response_data.get("current_funding_rail")
 
 
+class FeeFundsInsufficientError(APIError):
+    """402 - the send is paid from a linked account, StarMoney's fee is taken from
+    the customer's StarMoney vIBAN, and that vIBAN cannot cover it
+    (``error_code == "FEE_FUNDS_INSUFFICIENT"``, 0.4.0). Raised by the quote and by
+    the confirm; nothing moved. The customer tops up the StarMoney account (or the
+    send is refused), then asks again. Distinct from ``INSUFFICIENT_FUNDS``, which
+    is the paying account itself."""
+
+    @property
+    def starmoney_fee_minor(self) -> Optional[int]:
+        return self.response_data.get("starmoney_fee_minor")
+
+    @property
+    def available_minor(self) -> Optional[int]:
+        return self.response_data.get("available_minor")
+
+    @property
+    def shortfall_minor(self) -> Optional[int]:
+        return self.response_data.get("shortfall_minor")
+
+
 class InvalidSignatureError(StarmoneyError):
     """Webhook signature validation failed."""
 

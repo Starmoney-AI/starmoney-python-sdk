@@ -21,6 +21,7 @@ from .exceptions import (
     BankUnavailableError,
     BeneficiaryAddLimitReachedError,
     DuplicateResourceError,
+    FeeFundsInsufficientError,
     FundingRailChangedError,
     InvalidIBANError,
     InvalidPhoneError,
@@ -206,6 +207,8 @@ class HTTPClient:
             raise LinkIdRequiredError(response.status_code, message, error_data)
         if error_code == "LINK_IN_USE":
             raise LinkInUseError(response.status_code, message, error_data)
+        if error_code == "FEE_FUNDS_INSUFFICIENT":
+            raise FeeFundsInsufficientError(response.status_code, message, error_data)
         if error_code == "FUNDING_RAIL_CHANGED":
             raise FundingRailChangedError(response.status_code, message, error_data)
 

@@ -11,6 +11,8 @@ from __future__ import annotations
 
 from typing import Literal, Optional, TypedDict
 
+from starmoney.webhooks.payloads import Debit, FeeSource  # noqa: E402
+
 TransferDirection = Literal["in", "out"]
 
 
@@ -71,6 +73,11 @@ class TransferHistoryRow(_TransferHistoryRowBase, total=False):
     # send that confirmed no quote. ``total_debit_minor`` is what left the paying account.
     segment: Optional[Literal["p2p", "b2c", "b2b", "marketplace"]]
     funding_rail: Optional[Literal["viban", "bdk"]]
+    # Fee-from-StarMoney (0.4.0), additive: the per-account breakdown (``debits[]``,
+    # one row per payment: the fee is a line on it, never a row of its own) and
+    # where StarMoney's fee comes from; absent from a bank older than 0.4.0.
+    debits: Optional[list[Debit]]
+    fee_source: Optional[FeeSource]
     # B-78 (absent from a bank older than this field). out: the sender's saved
     # payee for this send and the name it carries NOW (the name at send time if
     # the payee was deleted); None when the send matched no saved payee. in (B-79):

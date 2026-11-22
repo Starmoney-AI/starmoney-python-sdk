@@ -143,6 +143,7 @@ class PaymentsResource:
                 the send is no longer the one the quote priced; re-quote, never
                 repriced silently; ``FundingRailChangedError`` carries
                 ``quoted_funding_rail`` / ``current_funding_rail``), 402 INSUFFICIENT_FUNDS (``required_minor``),
+                402 FEE_FUNDS_INSUFFICIENT (0.4.0, as on the quote),
                 404 NO_VIBAN_ACCOUNT.
             PreKycCeilingExceededError (403): over the per-send pre-KYC ceiling.
             PreKycTotalCeilingExceededError (403): over the cumulative pre-KYC
@@ -263,7 +264,9 @@ class PaymentsResource:
             ``amount_minor``, ``currency``, ``fees_minor {orchestrator, bank}``,
             ``fee_total_minor``, ``total_debit_minor``, ``fee_collection``,
             ``fee_grid_version``, ``segment`` + ``funding_rail`` (0.3.22: the fee
-            depends on who funds the send), ``send_remaining_minor``. The resolved IBAN is
+            depends on who funds the send), ``debits[]`` + ``fee_source`` (0.4.0:
+            the per-account breakdown, see :class:`starmoney.Debit`; the bank
+            computes it, never compute it yourself), ``send_remaining_minor``. The resolved IBAN is
             never returned.
 
         Raises (B-32 envelopes, see docs/ERRORS.md):
@@ -274,6 +277,11 @@ class PaymentsResource:
                 ``deferred_quote`` for ``POST /v1/deferred-transfers``, which
                 carries ``claim_by`` (B-117, 0.3.55: ISO 8601 UTC, the instant
                 the recipient must have claimed by);
+            402 FEE_FUNDS_INSUFFICIENT (0.4.0, ``FeeFundsInsufficientError``: a send
+                paid from a linked account whose StarMoney fee is taken from the
+                StarMoney vIBAN, and that vIBAN cannot cover it; carries
+                ``starmoney_fee_minor`` / ``available_minor`` / ``shortfall_minor``);
+                402 INSUFFICIENT_FUNDS (the linked account itself);
             404 BENEFICIARY_NOT_FOUND; 409 RECIPIENT_NOT_CREDITABLE /
                 BENEFICIARY_ACCOUNT_CLOSED; 429 IDENTIFIER_LOOKUP_LIMIT_REACHED
                 (``retry_after_seconds``); 403 PRE_KYC_*_CEILING_EXCEEDED;

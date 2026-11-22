@@ -22,7 +22,7 @@ shapes.
 
 from __future__ import annotations
 
-from typing import Literal, Optional, TypedDict
+from typing import Literal, NotRequired, Optional, TypedDict
 
 # Fee grid v2 (0.3.22, owner rulings 11 Nov 2026). ``segment`` is the pricing segment
 # of the send (today every send is ``p2p``: 1 %, no minimum; ``b2c`` / ``b2b`` /
@@ -31,6 +31,46 @@ from typing import Literal, Optional, TypedDict
 # linked BDK account (``bdk``).
 FeeSegment = Literal["p2p", "b2c", "b2b", "marketplace"]
 FundingRail = Literal["viban", "bdk"]
+
+
+# Fee-from-StarMoney (0.4.0): one entry of ``debits[]`` per account that is debited
+# for a send, and the lines that make up that account's total. The bank computes
+# every figure from the grid; a consumer renders ``debits[]`` and never computes.
+DebitAccount = Literal["linked", "starmoney"]
+
+# ``amount`` the principal; ``bank_fee`` the rail fee of the linked account's bank
+# (RTGS 2 500 F, collected by that bank); ``starmoney_fee`` StarMoney's fee;
+# ``rtgs_fee`` the fixed RTGS part of a StarMoney-funded send to an external bank,
+# collected by StarMoney. Closed vocabulary, never renamed; new kinds are additive.
+DebitLineKind = Literal["amount", "bank_fee", "starmoney_fee", "rtgs_fee"]
+
+# Who takes the line: ``None`` for the principal, else the institution id
+# (``"bdk"``) or ``"starmoney"``.
+DebitLineCollectedBy = Optional[str]
+
+# Where StarMoney's fee comes from: ``"starmoney"`` = the customer's StarMoney
+# vIBAN (the paying account is a linked account); ``"paying_account"`` = the
+# paying account itself.
+FeeSource = Literal["starmoney", "paying_account"]
+
+
+class DebitLine(TypedDict):
+    kind: DebitLineKind
+    amount_minor: int
+    collected_by: DebitLineCollectedBy
+
+
+class Debit(TypedDict):
+    """One account debited for a send. ``total_minor`` = the sum of ``lines``.
+    The ``debits[]`` entry of the PAYING account has ``total_minor ==
+    total_debit_minor``. ``institution`` and ``link_id`` are set when
+    ``account == "linked"``."""
+
+    account: DebitAccount
+    total_minor: int
+    lines: list[DebitLine]
+    institution: NotRequired[str]
+    link_id: NotRequired[str]
 
 
 class FeeLine(TypedDict):
@@ -60,6 +100,11 @@ class FeeLine(TypedDict):
     fee_grid_version: int
     segment: FeeSegment
     funding_rail: FundingRail
+    # Fee-from-StarMoney (0.4.0), additive. The per-account breakdown and where
+    # StarMoney's fee is taken; absent from a bank older than 0.4.0.
+    # ``fee_total_minor`` keeps its meaning (the sum of every fee line).
+    debits: NotRequired[list[Debit]]
+    fee_source: NotRequired[FeeSource]
 
 
 # ``funds`` on ``payment.failed`` (B-49, 0.3.0) — closed vocabulary, never
@@ -88,6 +133,10 @@ PaymentFailureReason = Literal[
     "bank_unreachable",
     "bank_refused_other",
     "technical",
+    # 0.4.0: the send is paid from a linked account and StarMoney's fee is taken
+    # from the StarMoney vIBAN, which could not cover it when the send was about to
+    # leave. ``funds`` is ``not_debited``; the linked account was never called.
+    "fee_funds_insufficient",
 ]
 
 
@@ -337,6 +386,9 @@ class PaymentInitiatedPayload(_PaymentInitiatedPayloadRequired, total=False):
     fees_minor: dict[str, int]
     fee_total_minor: int
     total_debit_minor: int
+    # Fee-from-StarMoney (0.4.0), additive: see :class:`FeeLine`.
+    debits: list[Debit]
+    fee_source: FeeSource
     fee_grid_version: int
     # 0.3.22 (fee grid v2): which pricing segment and which rail paid for the send.
     segment: FeeSegment
@@ -398,6 +450,9 @@ class PaymentRailFailedPayload(_PaymentRailFailedPayloadRequired, total=False):
     fees_minor: dict[str, int]
     fee_total_minor: int
     total_debit_minor: int
+    # Fee-from-StarMoney (0.4.0), additive: see :class:`FeeLine`.
+    debits: list[Debit]
+    fee_source: FeeSource
     fee_grid_version: int
     # 0.3.22 (fee grid v2): which pricing segment and which rail paid for the send.
     segment: FeeSegment
@@ -457,6 +512,9 @@ class PaymentBankStatusPayload(_PaymentBankStatusPayloadRequired, total=False):
     fees_minor: dict[str, int]
     fee_total_minor: int
     total_debit_minor: int
+    # Fee-from-StarMoney (0.4.0), additive: see :class:`FeeLine`.
+    debits: list[Debit]
+    fee_source: FeeSource
     fee_grid_version: int
     # 0.3.22 (fee grid v2): which pricing segment and which rail paid for the send.
     segment: FeeSegment
@@ -618,6 +676,11 @@ AccountKycReviewRequiredPayload = AccountLifecyclePayload
 __all__ = [
     "WebhookMetadata",
     "FeeLine",
+    "Debit",
+    "DebitLine",
+    "DebitLineKind",
+    "DebitAccount",
+    "FeeSource",
     "FundsOutcome",
     "PaymentFailureReason",
     "FeeRefundMarker",
