@@ -345,7 +345,9 @@ class DeferredTransferFailedPayload(_DeferredTransferFailedPayloadRequired, tota
     from the sender and nothing is retried. The sender's own ``payment.failed``
     (``funds=not_debited``) arrives separately; this one goes to the sending
     service so it can tell the recipient (``recipient_handle``).
-    ``reason_code``: ``bdk_refused`` | ``payment_failed``.
+    ``reason_code``: ``bdk_refused`` | ``payment_failed`` | ``fee_funds_insufficient``
+    (0.4.0, additive: the sender's StarMoney account could not cover StarMoney's fee when
+    the recipient claimed; the bank was never called).
     """
 
     client_reference: str  # ADR-004: only present when the caller supplied one

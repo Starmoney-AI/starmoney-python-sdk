@@ -96,7 +96,7 @@ class WebhookEvent(str, Enum):
     """A pull-funded (best-effort) transfer ended ``failed``: BDK refused the pull
     from the sender's account at the claim, or the pull payment failed. Nothing
     was taken and nothing is retried. Carries ``recipient_handle`` so the consumer
-    can tell the recipient. ``reason_code``: ``bdk_refused`` | ``payment_failed``."""
+    can tell the recipient. ``reason_code``: ``bdk_refused`` | ``payment_failed`` | ``fee_funds_insufficient``."""
 
     # -----------------------------------------------------------------
     # Account lifecycle — sensitivity: USER_PRIVATE (ADR-002)
