@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.3.63] — 2026-11-22
+
 - Fee from the StarMoney vIBAN (additive, ships with the service change): a send paid from a linked account has StarMoney's fee taken from the customer's StarMoney vIBAN, never from the linked account. New typed `debits[]` (`Debit` / `DebitLine` / `DebitLineKind` / `DebitAccount`, exported from `starmoney`) on the quote, the transfer history rows and the `payment.initiated` / `payment.failed` / `payment.bank_status` payloads: one entry per debited account with its `lines` (`amount`, `bank_fee`, `starmoney_fee`, `rtgs_fee`), the paying account's `total_minor` equal to `total_debit_minor`. The bank computes every line; never compute them. New `fee_source` (`FeeSource`: `"starmoney"` | `"paying_account"`). `FeeFundsInsufficientError` (402 `FEE_FUNDS_INSUFFICIENT`, from the quote and the confirm; `starmoney_fee_minor`, `available_minor`, `shortfall_minor`). New `PaymentFailureReason` value `fee_funds_insufficient` (`payment.failed` with `funds="not_debited"`; the linked account was never called). `fee_total_minor`, `total_debit_minor`, `fee_refund` and `fee_refund_minor` keep their meaning. A bank older than this change omits the new keys: read them with `.get()`.
 
 ## [0.3.62] — 2026-11-21
