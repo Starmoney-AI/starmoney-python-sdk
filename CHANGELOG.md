@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+## [0.3.66] — 2026-11-23
+
+- No SDK change (lockstep with the service: backoffice fix only).
+
 ## [0.3.65] — 2026-11-23
 
 - `DeferredTransferFailedPayload` gains the optional `starmoney_fee_minor` (int, XOF minor units): StarMoney's fee for the transfer, present only when it was to come from the sender's StarMoney vIBAN, absent otherwise. Read with `.get()`.
