@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+## [0.3.67] — 2026-11-23
+
+- No SDK change (lockstep with the service: backoffice pages only).
+
 ## [0.3.66] — 2026-11-23
 
 - No SDK change (lockstep with the service: backoffice fix only).
