@@ -179,6 +179,10 @@ class DeferredTransfersResource:
             RecipientLimitReachedError (403 RECIPIENT_LIMIT_REACHED, B-102): the
                 recipient's unverified account cannot hold this amount; refused
                 before the hold, no figure given. Lifted when they verify.
+            APIError (402 INSUFFICIENT_FUNDS, 0.3.73): the sender's account cannot
+                cover the hold for amount + fee; ``required_minor`` is what the hold
+                needed, never the balance. Nothing was held or written. Before 0.3.73
+                this was a 422 VALIDATION_FAILED.
             APIError (503): vIBAN ledger service unavailable (also when the
                 recipient's ledger account could not be read for the cap).
         """
