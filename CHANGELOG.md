@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+## [0.3.71] — 2026-11-24
+
+- No SDK change (lockstep with the service: backoffice UI only).
+
 ## [0.3.70] — 2026-11-23
 
 - No SDK change (lockstep with the service: backoffice UI only).
