@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.3.73] — 2026-11-24
+
 - `deferred_transfers.send` docstring: 402 `INSUFFICIENT_FUNDS` (`required_minor`) when the sender cannot cover the hold (service 0.3.73); it was a 422 `VALIDATION_FAILED`. No code change: `APIError` already carries the envelope.
 
 ## [0.3.72] — 2026-11-24
