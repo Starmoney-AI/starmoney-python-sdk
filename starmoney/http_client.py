@@ -32,6 +32,7 @@ from .exceptions import (
     InstitutionAlreadyLinkedError,
     LinkIdRequiredError,
     LinkInUseError,
+    LinkedFundingNotAllowedError,
     LinkLimitReachedError,
     LinkNotFoundError,
     LinkVerificationFailedError,
@@ -207,6 +208,8 @@ class HTTPClient:
             raise LinkIdRequiredError(response.status_code, message, error_data)
         if error_code == "LINK_IN_USE":
             raise LinkInUseError(response.status_code, message, error_data)
+        if error_code == "LINKED_FUNDING_NOT_ALLOWED":
+            raise LinkedFundingNotAllowedError(response.status_code, message, error_data)
         if error_code == "FEE_FUNDS_INSUFFICIENT":
             raise FeeFundsInsufficientError(response.status_code, message, error_data)
         if error_code == "FUNDING_RAIL_CHANGED":

@@ -8,8 +8,8 @@ from unittest.mock import AsyncMock, MagicMock
 import httpx
 import pytest
 
-from starmoney import (LinkIdRequiredError, LinkInUseError, LinkLimitReachedError,
-                       LinkNotFoundError)
+from starmoney import (LinkedFundingNotAllowedError, LinkIdRequiredError, LinkInUseError,
+                       LinkLimitReachedError, LinkNotFoundError)
 from starmoney.http_client import HTTPClient
 from starmoney.resources.accounts import AccountsResource
 from starmoney.resources.payments import PaymentsResource
@@ -36,6 +36,9 @@ def _raised(status: int, body: dict):
         (409, {"error_code": "LINK_IN_USE", "kind": "state", "link_id": EPARGNE,
                "deferred_transfer_ids": ["dt-2"]},
          LinkInUseError, "deferred_transfer_ids", ["dt-2"]),
+        (409, {"error_code": "LINKED_FUNDING_NOT_ALLOWED", "kind": "state",
+               "allowed_funding_rails": ["viban"], "recipient_status": "no_account"},
+         LinkedFundingNotAllowedError, "allowed_funding_rails", ["viban"]),
     ],
 )
 def test_link_errors_map_to_their_typed_errors(status, body, exc_cls, attr, value):

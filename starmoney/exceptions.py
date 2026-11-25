@@ -401,6 +401,24 @@ class LinkInUseError(APIError):
         return list(self.response_data.get("deferred_transfer_ids") or [])
 
 
+class LinkedFundingNotAllowedError(APIError):
+    """409 - a deferred transfer (a phone with no open StarMoney account) cannot be
+    paid from a linked account (``error_code == "LINKED_FUNDING_NOT_ALLOWED"``, owner
+    ruling 25 Nov 2026, service 0.3.74). Raised by the quote (``recipient_status`` set)
+    and by ``deferred_transfers.send`` for a pull or a quote priced for a linked
+    account. Nothing was stored or held. Offer the StarMoney account
+    (``allowed_funding_rails`` = ``["viban"]``) or an invitation instead. Example: Awa
+    picks «Épargne» to send 25 000 F to +221 77 000 00 01, who has no account."""
+
+    @property
+    def allowed_funding_rails(self) -> list[str]:
+        return list(self.response_data.get("allowed_funding_rails") or [])
+
+    @property
+    def recipient_status(self) -> Optional[str]:
+        return self.response_data.get("recipient_status")
+
+
 class FundingRailChangedError(APIError):
     """409 - between the preview and the confirm the rail that funds the send changed
     (``error_code == "FUNDING_RAIL_CHANGED"``, 0.3.22). The quote priced a send funded
