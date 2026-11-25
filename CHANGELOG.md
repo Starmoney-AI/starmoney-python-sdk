@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+## [0.3.75] — 2026-11-26
+
+- No SDK surface change (lockstep with service 0.3.75: a refusal BDK decided no longer dead-letters on the worker).
+
 ## [0.3.74] — 2026-11-25
 
 - `LinkedFundingNotAllowedError` (409 `LINKED_FUNDING_NOT_ALLOWED`, service 0.3.74; owner ruling 25 Nov 2026): a deferred transfer (a phone with no open StarMoney account) cannot be paid from a linked account. Raised by `payments.create_quote` (with `recipient_status`) and `deferred_transfers.send`. Exposes `allowed_funding_rails` (`["viban"]`) and `recipient_status`.
