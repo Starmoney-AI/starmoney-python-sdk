@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+## [0.3.76] — 2026-11-27
+
+- No SDK surface change (lockstep with service 0.3.76: a deferred transfer claimed inside a short window settles; the hold outlives the window by a 2 h settle margin).
+
 ## [0.3.75] — 2026-11-26
 
 - No SDK surface change (lockstep with service 0.3.75: a refusal BDK decided no longer dead-letters on the worker).
